@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "core/**/*.ts",
+    "admin-dashboard.tsx",
+    "admin-login.tsx",
+    "admin-batches.tsx",
+    "admin-analytics.tsx",
+    "admin-abandoned-cart.tsx",
+    "customer-tracking.tsx",
+    "vite-env.d.ts"
+  ]
+}
