@@ -1,17 +1,24 @@
-import { useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
-import { createBatch, listAvailableOrders, listBatches, selectBatch } from "./core/batch-store";
+import { createBatch, listAvailableOrders, listBatches, replaceBatches, selectBatch } from "./core/batch-store";
 import type { BatchOrder, BatchRecord, CreateBatchPayload } from "./core/batch-store";
+import { syncOrderCollectionFromServer } from "./core/order-store";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 import AdminSidebar from "./core/admin-sidebar";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
 
-const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const NAV: [string, string][] = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const calcBatch = (orderIds: string[], allOrders: BatchOrder[]) => {
-  const orders = allOrders.filter(o => orderIds.includes(o.id));
+  const keys = new Set(orderIds.map((id) => String(id || "").trim().toLowerCase()));
+  const orders = allOrders.filter((o) => {
+    const idKey = String(o.id || "").trim().toLowerCase();
+    const numKey = String(o.num || "").trim().toLowerCase();
+    return keys.has(idKey) || keys.has(numKey);
+  });
   let totalBuy = 0, totalSell = 0;
   orders.forEach(o => o.items.forEach(it => {
     totalBuy  += it.buyPrice  * it.qty;
@@ -147,15 +154,47 @@ function CreateBatchModal({ onClose, onCreated, orders, T }: { onClose: () => vo
 export default function BatchesPage() {
   const [dark,          setDark]          = useState(false);
   const T = dark ? DARK : LIGHT;
-  const [orders]                           = useState<BatchOrder[]>(() => listAvailableOrders());
+  const [orders,        setOrders]        = useState<BatchOrder[]>(() => listAvailableOrders());
   const [batches,       setBatches]       = useState<BatchRecord[]>(() => listBatches());
   const [showCreate,    setShowCreate]    = useState(false);
   const [search,        setSearch]        = useState("");
+  const [hydrated,      setHydrated]      = useState(false);
   const sessionUser = loadSession()?.user;
   const userName = sessionUser?.name || "Admin";
   const userRole = sessionUser?.role === "agent" ? "Agent" : "Super Admin";
   const userAvatar = sessionUser?.avatar || "A";
   const userColor = sessionUser?.color || "linear-gradient(135deg,#6366F1,#A855F7)";
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrateFromServer = async () => {
+      try {
+        await syncOrderCollectionFromServer([]);
+        const persistedBatches = await loadAppState<BatchRecord[]>("batches.records", listBatches());
+        if (cancelled) {
+          return;
+        }
+        setOrders(listAvailableOrders());
+        const syncedBatches = replaceBatches(Array.isArray(persistedBatches) ? persistedBatches : listBatches());
+        setBatches(syncedBatches);
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
+      }
+    };
+    void hydrateFromServer();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    void saveAppState("batches.records", batches);
+  }, [batches, hydrated]);
 
   const filtered = batches.filter(b =>
     !search ||
@@ -262,6 +301,7 @@ export default function BatchesPage() {
                   <div>
                     <button onClick={() => {
                       selectBatch(b.id);
+                      void saveAppState("batches.selectedId", b.id);
                       window.location.hash = "#/admin/batch-detail";
                     }}
                       style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"7px", padding:"6px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>

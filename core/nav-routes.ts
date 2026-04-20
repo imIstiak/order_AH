@@ -15,6 +15,7 @@ const ADMIN_NAV_ROUTE_MAP: Record<string, string> = {
   Analytics: "#/admin/analytics",
   "bKash Verification": "#/admin/bkash-verification",
   "Order Issues": "#/admin/order-issues",
+  "API Health": "#/admin/api-health",
   Settings: "#/admin/settings",
   Team: "#/admin/team",
   Profile: "#/admin/profile",

@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { loadSession } from "./core/auth-session";
-import { getSelectedBatchId, listAvailableOrders, listBatches, selectBatch } from "./core/batch-store";
+import { getSelectedBatchId, listAvailableOrders, listBatches, replaceBatches, selectBatch, setSelectedBatchId as persistSelectedBatchId } from "./core/batch-store";
+import type { BatchOrder, BatchRecord } from "./core/batch-store";
+import { syncOrderCollectionFromServer } from "./core/order-store";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 import * as XLSX from "xlsx";
 import AdminSidebar from "./core/admin-sidebar";
 
@@ -11,55 +14,6 @@ const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba
 const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const CNY_TO_BDT = 15;
-
-// ── MOCK DATA ─────────────────────────────────────────────────
-const BATCH = {
-  id:"b1", batchCode:"BATCH-4421",
-  batchName:"Ali Express Restock April W3",
-  note:"Source from Ali Express Store #4421. Check sizing carefully before ordering. Expected sourcing window: 3 days.",
-  createdAt:"17 Apr 2026, 10:00 AM", createdBy:"Istiak Shaharia",
-};
-
-const ORDERS = [
-  {
-    id:"o1", num:"#1001", customer:"Fatima Akter",   phone:"01711111111",
-    address:"House 12, Road 5, Dhanmondi, Dhaka", status:"confirmed", codDue:4300,
-    items:[
-      { productId:"P001", name:"Leather Tote Bag",    code:"LTB-001", color:"Black",  size:"M",    qty:1, buyPrice:1400, sellPrice:2500, sourceUrl:"https://aliexpress.com/item/LTB001" },
-      { productId:"P003", name:"Silver Bracelet",      code:"SB-003",  color:"Silver", size:"Free", qty:1, buyPrice:600,  sellPrice:1800, sourceUrl:"" },
-    ],
-  },
-  {
-    id:"o2", num:"#1002", customer:"Rahela Khanam",  phone:"01722222222",
-    address:"Flat 3B, Road 10, Uttara Sector 7, Dhaka", status:"shipped", codDue:2400,
-    items:[
-      { productId:"P002", name:"High Ankle Converse", code:"HAC-002", color:"White",  size:"38",   qty:1, buyPrice:1600, sellPrice:3200, sourceUrl:"https://aliexpress.com/item/HAC002" },
-    ],
-  },
-  {
-    id:"o3", num:"#1003", customer:"Sabrina Islam",  phone:"01633333333",
-    address:"Zindabazar Chairman Bari, Sylhet", status:"confirmed", codDue:5200,
-    items:[
-      { productId:"P004", name:"Quilted Shoulder Bag",code:"QSB-004", color:"Pink",   size:"M",    qty:2, buyPrice:1800, sellPrice:3500, sourceUrl:"https://aliexpress.com/item/QSB004" },
-    ],
-  },
-  {
-    id:"o4", num:"#1004", customer:"Mithila Rahman", phone:"01544444444",
-    address:"Block C, Mirpur 12, Dhaka", status:"pending", codDue:5900,
-    items:[
-      { productId:"P005", name:"Platform Sneakers",   code:"PS-005",  color:"Black",  size:"37",   qty:1, buyPrice:1900, sellPrice:3800, sourceUrl:"https://aliexpress.com/item/PS005" },
-      { productId:"P007", name:"Gold Chain Necklace", code:"GCN-007", color:"Gold",   size:"Free", qty:1, buyPrice:700,  sellPrice:2100, sourceUrl:"" },
-    ],
-  },
-  {
-    id:"o5", num:"#1005", customer:"Taslima Begum",  phone:"01355555555",
-    address:"House 4, Road 9, Banani, Dhaka", status:"delivered", codDue:0,
-    items:[
-      { productId:"P001", name:"Leather Tote Bag",    code:"LTB-001", color:"Brown",  size:"L",    qty:1, buyPrice:1400, sellPrice:2500, sourceUrl:"https://aliexpress.com/item/LTB001" },
-      { productId:"P002", name:"High Ankle Converse", code:"HAC-002", color:"White",  size:"39",   qty:1, buyPrice:1600, sellPrice:3200, sourceUrl:"https://aliexpress.com/item/HAC002" },
-    ],
-  },
-];
 
 const STATUS_COLOR = { confirmed:"#6366F1", shipped:"#2563EB", pending:"#D97706", delivered:"#059669", cancelled:"#DC2626" };
 
@@ -300,32 +254,80 @@ export default function BatchDetailPage() {
   const T = dark ? DARK : LIGHT;
   const [exporting, setExporting] = useState(false);
   const [tab, setTab]         = useState("summary"); // summary | orders
+  const [allBatches, setAllBatches] = useState<BatchRecord[]>(() => listBatches());
+  const [allOrders, setAllOrders] = useState<BatchOrder[]>(() => listAvailableOrders());
+  const [selectedBatchId, setSelectedBatchId] = useState<string | null>(() => getSelectedBatchId());
+  const [hydrated, setHydrated] = useState(false);
   const sessionUser = loadSession()?.user;
   const userName = sessionUser?.name || "Admin";
   const userRole = sessionUser?.role === "agent" ? "Agent" : "Super Admin";
   const userAvatar = sessionUser?.avatar || "A";
   const userColor = sessionUser?.color || "linear-gradient(135deg,#6366F1,#A855F7)";
 
-  const allBatches = listBatches();
-  const allOrders = listAvailableOrders();
-  const selectedBatchId = getSelectedBatchId();
+  useEffect(() => {
+    let cancelled = false;
+    const hydrateFromServer = async () => {
+      try {
+        await syncOrderCollectionFromServer([]);
+        const [persistedBatches, persistedSelectedBatchId] = await Promise.all([
+          loadAppState<BatchRecord[]>("batches.records", listBatches()),
+          loadAppState<string | null>("batches.selectedId", getSelectedBatchId()),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        const syncedBatches = replaceBatches(Array.isArray(persistedBatches) ? persistedBatches : listBatches());
+        const nextSelectedBatchId = persistedSelectedBatchId || syncedBatches[0]?.id || null;
+        setAllBatches(syncedBatches);
+        setAllOrders(listAvailableOrders());
+        setSelectedBatchId(nextSelectedBatchId);
+      } finally {
+        if (!cancelled) {
+          setHydrated(true);
+        }
+      }
+    };
+    void hydrateFromServer();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    persistSelectedBatchId(selectedBatchId);
+    if (selectedBatchId) {
+      selectBatch(selectedBatchId);
+    }
+    void saveAppState("batches.selectedId", selectedBatchId);
+  }, [hydrated, selectedBatchId]);
+
+  useEffect(() => {
+    if (!hydrated || selectedBatchId || !allBatches.length) {
+      return;
+    }
+    setSelectedBatchId(allBatches[0].id);
+  }, [allBatches, hydrated, selectedBatchId]);
+
   const BATCH = allBatches.find((batch) => batch.id === selectedBatchId) || allBatches[0] || {
-    id: "fallback-batch",
-    batchCode: "BATCH-0000",
-    batchName: "Fallback Batch",
+    id: "",
+    batchCode: "",
+    batchName: "",
     note: "",
     orderIds: [],
     createdAt: "",
-    createdBy: "System",
+    createdBy: "",
   };
   const batchOrderIds = Array.isArray(BATCH.orderIds)
-    ? new Set(BATCH.orderIds.map((id) => String(id || "").toLowerCase()))
+    ? new Set(BATCH.orderIds.map((id) => String(id || "").trim().toLowerCase()))
     : new Set();
-  const ORDERS = allOrders.filter((order) => batchOrderIds.has(String(order.id || "").toLowerCase()));
-
-  if (!selectedBatchId && BATCH?.id) {
-    selectBatch(BATCH.id);
-  }
+  const ORDERS = allOrders.filter((order) => {
+    const idKey = String(order.id || "").trim().toLowerCase();
+    const numKey = String(order.num || "").trim().toLowerCase();
+    return batchOrderIds.has(idKey) || batchOrderIds.has(numKey);
+  });
 
   const pmap    = buildProductMap(ORDERS);
   const products = Object.values(pmap);

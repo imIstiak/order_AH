@@ -1,23 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
-import { appendTimelineEvent, loadOrderCollection, saveOrderCollection } from "./core/order-store";
+import { appendOrderToServer, appendTimelineEvent, loadOrderCollection, syncOrderCollectionFromServer } from "./core/order-store";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", success:"#059669", warning:"#D97706" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#FFFFFF", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", success:"#059669", warning:"#D97706" };
-
-const CATALOG = [
-  { id:"p1",  name:"Leather Tote Bag",     price:2500, sizes:["S","M","L"],             colors:["Black","Brown","Beige"],  img:"🛍️", bg:"#92400E", cat:"Bags",        stock:{"S-Black":3,"S-Brown":2,"S-Beige":0,"M-Black":0,"M-Brown":1,"M-Beige":4,"L-Black":2,"L-Brown":0,"L-Beige":1} },
-  { id:"p2",  name:"High Ankle Converse",  price:3200, sizes:["36","37","38","39","40"], colors:["White","Black"],          img:"👟", bg:"#1E40AF", cat:"Shoes",       stock:{"36-White":2,"36-Black":1,"37-White":0,"37-Black":3,"38-White":5,"38-Black":0,"39-White":2,"39-Black":2,"40-White":0,"40-Black":1} },
-  { id:"p3",  name:"Canvas Backpack",      price:2400, sizes:["M","L"],                 colors:["Olive","Grey","Navy"],    img:"🎒", bg:"#065F46", cat:"Bags",        stock:{"M-Olive":4,"M-Grey":2,"M-Navy":0,"L-Olive":1,"L-Grey":0,"L-Navy":3} },
-  { id:"p4",  name:"Silver Bracelet",      price:1800, sizes:["Free"],                  colors:["Silver","Gold"],          img:"📿", bg:"#6B21A8", cat:"Accessories", stock:{"Free-Silver":8,"Free-Gold":0} },
-  { id:"p5",  name:"Quilted Shoulder Bag", price:3500, sizes:["S","M"],                 colors:["Beige","Pink","Black"],   img:"👜", bg:"#9D174D", cat:"Bags",        stock:{"S-Beige":2,"S-Pink":0,"S-Black":1,"M-Beige":0,"M-Pink":3,"M-Black":2} },
-  { id:"p6",  name:"Platform Sneakers",    price:3800, sizes:["36","37","38","39","40"], colors:["White","Black"],          img:"👠", bg:"#7C3AED", cat:"Shoes",       stock:{"36-White":0,"36-Black":0,"37-White":2,"37-Black":1,"38-White":0,"38-Black":3,"39-White":1,"39-Black":0,"40-White":2,"40-Black":1} },
-  { id:"p7",  name:"Embroidered Clutch",   price:2200, sizes:["Free"],                  colors:["Red","Blue","Gold"],      img:"👝", bg:"#B91C1C", cat:"Bags",        stock:{"Free-Red":3,"Free-Blue":1,"Free-Gold":0} },
-  { id:"p8",  name:"Ankle Strap Heels",    price:2800, sizes:["36","37","38","39"],     colors:["Nude","Black"],           img:"🥿", bg:"#B45309", cat:"Shoes",       stock:{"36-Nude":2,"36-Black":1,"37-Nude":0,"37-Black":4,"38-Nude":3,"38-Black":0,"39-Nude":1,"39-Black":2} },
-  { id:"p9",  name:"Gold Chain Necklace",  price:2100, sizes:["Free"],                  colors:["Gold","Rose Gold"],       img:"💛", bg:"#92400E", cat:"Accessories", stock:{"Free-Gold":5,"Free-Rose Gold":2} },
-  { id:"p10", name:"Woven Raffia Bag",     price:1900, sizes:["S","M","L"],             colors:["Natural","Black"],        img:"🧺", bg:"#78350F", cat:"Bags",        stock:{"S-Natural":3,"S-Black":2,"M-Natural":0,"M-Black":1,"L-Natural":4,"L-Black":0} },
-];
 
 const ZONES = {
   "Dhaka":["Dhanmondi","Uttara","Mirpur","Banani","Gulshan","Mohammadpur","Motijheel","Tejgaon","Bashundhara","Badda"],
@@ -53,6 +40,9 @@ const getStockCount = (prod, size, color) => {
   return v === undefined ? null : v;
 };
 
+const normalizeBdPhoneInput = (value) => String(value || "").replace(/\D/g, "").slice(0, 11);
+const isValidBdPhone = (value) => /^01\d{9}$/.test(String(value || ""));
+
 // ── SUB-COMPONENTS (outside App) ─────────────────────────────────────────
 
 function SL({ c, T, req }) {
@@ -83,9 +73,9 @@ function Sel({ value, onChange, children, T, disabled }) {
   );
 }
 
-function Card({ title, icon, children, T }) {
+function Card({ title, icon, children, T, overflowVisible = false }) {
   return (
-    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"14px",overflow:"hidden"}}>
+    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:"12px",marginBottom:"14px",overflow:overflowVisible?"visible":"hidden"}}>
       <div style={{padding:"11px 16px",borderBottom:`1px solid ${T.border}`,display:"flex",alignItems:"center",gap:"7px"}}>
         <span style={{fontSize:"14px"}}>{icon}</span>
         <span style={{fontSize:"12px",fontWeight:700,color:T.text}}>{title}</span>
@@ -173,6 +163,9 @@ function SuccessScreen({ T, orderNum, custName, custPhone, items, discAmt, deliv
 export default function CreateOrder() {
   const [dark, setDark] = useState(false);
   const T = dark ? DARK : LIGHT;
+  const [catalog, setCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState("");
 
   const [source,       setSource]       = useState("");
   const [custName,     setCustName]     = useState("");
@@ -205,20 +198,68 @@ export default function CreateOrder() {
   const [delOut] = useState(150);
   const searchRef = useRef(null);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadCatalogFromDb = async () => {
+      setCatalogLoading(true);
+      setCatalogError("");
+      try {
+        const response = await fetch("/api/products");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to load product catalog.");
+        }
+
+        if (cancelled) return;
+        const products = Array.isArray(payload?.products) ? payload.products : [];
+        const mapped = products.map((p) => ({
+          id: String(p.id || ""),
+          name: String(p.name || "Unnamed Product"),
+          price: Number(p.price) || 0,
+          sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes : ["Free"],
+          colors: Array.isArray(p.colors) && p.colors.length ? p.colors : ["Default"],
+          img: String(p.img || "🛍️"),
+          bg: String(p.bg || "#334155"),
+          cat: String(p.category || "Uncategorized"),
+          subCat: String(p.subCategory || ""),
+          featuredPhoto: String(p.featuredPhoto || ""),
+          stock: p.stock && typeof p.stock === "object" ? p.stock : {},
+        }));
+        setCatalog(mapped);
+      } catch (error) {
+        if (cancelled) return;
+        setCatalogError(error?.message || "Failed to sync product catalog.");
+        setCatalog([]);
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    };
+
+    loadCatalogFromDb();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const deliveryCharge = deliveryZone==="inside" ? delIn : deliveryZone==="outside" ? delOut : 0;
   const subtotal  = items.reduce((s,i)=>s+i.price*i.qty,0);
   const discAmt   = !discount ? 0 : discType==="pct" ? Math.round(subtotal*discount/100) : discount;
   const codDue    = Math.max(0, subtotal-discAmt+deliveryCharge-advance);
-  const selProd   = CATALOG.find(p=>p.id===selProdId)||null;
+  const selProd   = catalog.find(p=>p.id===selProdId)||null;
   const stockCount = getStockCount(selProd, selSize, selColor);
   const autoType  = stockCount===null ? "stock" : stockCount>0 ? "stock" : "preorder";
   const effectiveType = autoType;
   const orderNum = createdOrderNum || "#" + (1011 + items.length + (custPhone.length % 50));
   const orderLink = `${window.location.origin}/#/invoice?order=${encodeURIComponent(orderNum)}`;
 
-  const filtProd = CATALOG.filter(p =>
-    !searchQ || p.name.toLowerCase().includes(searchQ.toLowerCase()) || p.cat.toLowerCase().includes(searchQ.toLowerCase())
-  ).slice(0,8);
+  const filtProd = catalog.filter(p => {
+    if (!searchQ) return true;
+    const q = searchQ.toLowerCase();
+    return p.name.toLowerCase().includes(q)
+      || String(p.cat || "").toLowerCase().includes(q)
+      || String(p.subCat || "").toLowerCase().includes(q);
+  }).slice(0,30);
 
   useEffect(() => {
     const fn = (e) => { if (searchRef.current && !searchRef.current.contains(e.target)) setShowDrop(false); };
@@ -230,21 +271,22 @@ export default function CreateOrder() {
 
   const addItem = () => {
     if (!selProdId||!selSize||!selColor) return;
-    const p = CATALOG.find(x=>x.id===selProdId); if (!p) return;
+    const p = catalog.find(x=>x.id===selProdId); if (!p) return;
     const idx = items.findIndex(i=>i.pid===p.id&&i.size===selSize&&i.color===selColor);
     if (idx>=0) { setItems(prev=>prev.map((it,i)=>i===idx?{...it,qty:it.qty+selQty}:it)); }
-    else { setItems(prev=>[...prev,{pid:p.id,name:p.name,img:p.img,bg:p.bg,size:selSize,color:selColor,qty:selQty,price:p.price,type:effectiveType}]); }
+    else { setItems(prev=>[...prev,{pid:p.id,name:p.name,img:p.img,bg:p.bg,featuredPhoto:p.featuredPhoto||"",size:selSize,color:selColor,qty:selQty,price:p.price,type:effectiveType}]); }
     setSearchQ(""); setSelProdId(""); setSelSize(""); setSelColor(""); setSelQty(1);
   };
 
   const rmItem = (i)   => setItems(p=>p.filter((_,j)=>j!==i));
   const chgQty = (i,v) => setItems(p=>p.map((it,j)=>j===i?{...it,qty:Math.max(1,parseInt(v)||1)}:it));
 
-  const canConfirm = custName&&custPhone&&custCity&&custZone&&custAddr&&items.length>0&&payMethod&&source&&deliveryZone;
-  const canLink    = custName&&custPhone&&custCity&&custZone&&items.length>0&&deliveryZone;
+  const phoneInvalid = custPhone.length > 0 && !isValidBdPhone(custPhone);
+  const canConfirm = custName&&custPhone&&custCity&&custZone&&custAddr&&items.length>0&&payMethod&&source&&deliveryZone&&!phoneInvalid;
+  const canLink    = custName&&custPhone&&custCity&&custZone&&items.length>0&&deliveryZone&&!phoneInvalid;
 
-  const getNextOrderNumber = () => {
-    const existing = loadOrderCollection([]);
+  const getNextOrderNumber = async () => {
+    const existing = await syncOrderCollectionFromServer([]);
     let maxNum = 1000;
     existing.forEach((order) => {
       const numeric = parseInt(String(order?.num || "").replace(/[^0-9]/g, ""), 10);
@@ -255,8 +297,8 @@ export default function CreateOrder() {
     return `#${maxNum + 1}`;
   };
 
-  const createOrderRecord = (mode) => {
-    const nextNum = getNextOrderNumber();
+  const createOrderRecord = async (mode) => {
+    const nextNum = await getNextOrderNumber();
     const area = `${custCity} / ${custZone}`;
     const orderType = items.some((item) => item.type === "preorder") ? "preorder" : "stock";
     const now = new Date();
@@ -294,13 +336,12 @@ export default function CreateOrder() {
     };
 
     const withTimeline = appendTimelineEvent(baseOrder, "Placed", custNote, isAgent ? "agent" : "admin");
-    const existing = loadOrderCollection([]);
-    saveOrderCollection([withTimeline, ...existing]);
+    await appendOrderToServer(withTimeline as any);
     return nextNum;
   };
 
-  const handleCreate = (mode) => {
-    const nextNum = createOrderRecord(mode);
+  const handleCreate = async (mode) => {
+    const nextNum = await createOrderRecord(mode);
     setCreatedOrderNum(nextNum);
     setDone(mode);
   };
@@ -394,7 +435,8 @@ export default function CreateOrder() {
               </div>
               <div>
                 <SL c="Phone Number" T={T} req/>
-                <Inp value={custPhone} onChange={e=>setCustPhone(e.target.value)} placeholder="01XXXXXXXXX" T={T}/>
+                <Inp value={custPhone} onChange={e=>setCustPhone(normalizeBdPhoneInput(e.target.value))} placeholder="01XXXXXXXXX" T={T}/>
+                {phoneInvalid && <div style={{marginTop:"6px",fontSize:"11px",color:"#DC2626"}}>Use a valid Bangladesh number (11 digits, starts with 01).</div>}
               </div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px",marginBottom:"10px"}}>
@@ -434,7 +476,7 @@ export default function CreateOrder() {
         <div>
 
           {/* Products */}
-          <Card title="Products" icon="🛍️" T={T}>
+          <Card title="Products" icon="🛍️" T={T} overflowVisible>
 
             {/* Search */}
             <div ref={searchRef} style={{position:"relative",marginBottom:"12px"}}>
@@ -445,21 +487,28 @@ export default function CreateOrder() {
                   onFocus={()=>setShowDrop(true)} placeholder="Type product name or category..."
                   style={{background:T.input,border:`1.5px solid ${T.ib}`,borderRadius:"8px",color:T.text,padding:"9px 12px 9px 32px",fontSize:"12px",outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit"}}/>
               </div>
+              {catalogLoading && <div style={{marginTop:"6px",fontSize:"10px",color:T.textMuted}}>Syncing latest products from database...</div>}
+              {catalogError && <div style={{marginTop:"6px",fontSize:"10px",color:"#D97706"}}>Catalog sync warning: {catalogError}</div>}
               {showDrop&&(
-                <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:"10px",zIndex:100,boxShadow:"0 16px 40px rgba(0,0,0,0.18)",overflow:"hidden",maxHeight:"240px",overflowY:"auto"}}>
+                <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,right:0,background:T.surface,border:`1px solid ${T.border}`,borderRadius:"10px",zIndex:100,boxShadow:"0 16px 40px rgba(0,0,0,0.18)",overflow:"hidden",maxHeight:"520px",overflowY:"auto"}}>
                   {filtProd.map(p=>(
                     <div key={p.id} onClick={()=>pickProd(p)}
-                      style={{display:"flex",alignItems:"center",gap:"10px",padding:"9px 12px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
+                      style={{display:"flex",alignItems:"center",gap:"10px",padding:"10px 12px",cursor:"pointer",borderBottom:`1px solid ${T.border}`}}
                       onMouseEnter={e=>e.currentTarget.style.background=T.bg}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                      <div style={{width:"34px",height:"34px",borderRadius:"7px",background:p.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"17px",flexShrink:0}}>{p.img}</div>
+                      <div style={{width:"34px",height:"34px",borderRadius:"7px",background:p.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"17px",flexShrink:0,overflow:"hidden"}}>
+                        {p.featuredPhoto ? <img src={p.featuredPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : p.img}
+                      </div>
                       <div style={{flex:1}}>
                         <div style={{fontSize:"12px",fontWeight:600,color:T.text}}>{p.name}</div>
-                        <div style={{fontSize:"10px",color:T.textMuted}}>{p.cat}</div>
+                        <div style={{fontSize:"10px",color:T.textMuted}}>{p.cat}{p.subCat ? ` • ${p.subCat}` : ""}</div>
                       </div>
                       <div style={{fontSize:"12px",fontWeight:700,color:T.accent}}>৳{p.price.toLocaleString()}</div>
                     </div>
                   ))}
+                  {filtProd.length === 0 && (
+                    <div style={{padding:"12px",fontSize:"11px",color:T.textMuted,textAlign:"center"}}>No products matched your search.</div>
+                  )}
                 </div>
               )}
             </div>
@@ -468,7 +517,9 @@ export default function CreateOrder() {
             {selProd&&(
               <div style={{background:T.accent+"08",border:`1.5px solid ${T.accent}22`,borderRadius:"9px",padding:"12px",marginBottom:"12px"}}>
                 <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"10px"}}>
-                  <div style={{width:"42px",height:"42px",borderRadius:"9px",background:selProd.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px",flexShrink:0}}>{selProd.img}</div>
+                  <div style={{width:"42px",height:"42px",borderRadius:"9px",background:selProd.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"22px",flexShrink:0,overflow:"hidden"}}>
+                    {selProd.featuredPhoto ? <img src={selProd.featuredPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : selProd.img}
+                  </div>
                   <div>
                     <div style={{fontSize:"13px",fontWeight:700,color:T.text}}>{selProd.name}</div>
                     <div style={{fontSize:"11px",color:T.textMuted}}>৳{selProd.price.toLocaleString()} per item</div>
@@ -517,7 +568,9 @@ export default function CreateOrder() {
               <div>
                 {items.map((it,idx)=>(
                   <div key={idx} style={{display:"flex",alignItems:"center",gap:"8px",padding:"9px 10px",background:T.bg,border:`1px solid ${T.border}`,borderRadius:"8px",marginBottom:"6px"}}>
-                    <div style={{width:"32px",height:"32px",borderRadius:"7px",background:it.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",flexShrink:0}}>{it.img}</div>
+                    <div style={{width:"32px",height:"32px",borderRadius:"7px",background:it.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"16px",flexShrink:0,overflow:"hidden"}}>
+                      {it.featuredPhoto ? <img src={it.featuredPhoto} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/> : it.img}
+                    </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:"flex",alignItems:"center",gap:"5px"}}>
                         <span style={{fontSize:"11px",fontWeight:600,color:T.text,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{it.name}</span>

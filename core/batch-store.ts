@@ -1,5 +1,7 @@
-const BATCHES_KEY = "shopadmin.batches.v1";
-const SELECTED_BATCH_KEY = "shopadmin.batches.selected.v1";
+import { loadOrderCollection } from "./order-store";
+
+const BATCHES_KEY = "shopadmin.batches.v2";
+const SELECTED_BATCH_KEY = "shopadmin.batches.selected.v2";
 
 type BatchOrderItem = {
   productId: string;
@@ -51,139 +53,7 @@ function normalizeOrderId(orderId: unknown): string {
   return String(orderId || "").trim().toLowerCase();
 }
 
-const MOCK_ORDERS: BatchOrder[] = [
-  {
-    id: "o1",
-    num: "#1001",
-    customer: "Fatima Akter",
-    phone: "01711111111",
-    address: "House 12, Road 5, Dhanmondi, Dhaka",
-    codDue: 4300,
-    status: "confirmed",
-    items: [
-      { productId: "P001", name: "Leather Tote Bag", code: "LTB-001", color: "Black", size: "M", qty: 1, buyPrice: 1400, sellPrice: 2500, sourceUrl: "https://aliexpress.com/item/LTB001" },
-      { productId: "P003", name: "Silver Bracelet", code: "SB-003", color: "Silver", size: "Free", qty: 1, buyPrice: 600, sellPrice: 1800, sourceUrl: "" },
-    ],
-  },
-  {
-    id: "o2",
-    num: "#1002",
-    customer: "Rahela Khanam",
-    phone: "01722222222",
-    address: "Flat 3B, Road 10, Uttara Sector 7, Dhaka",
-    codDue: 2400,
-    status: "shipped",
-    items: [
-      { productId: "P002", name: "High Ankle Converse", code: "HAC-002", color: "White", size: "38", qty: 1, buyPrice: 1600, sellPrice: 3200, sourceUrl: "https://aliexpress.com/item/HAC002" },
-    ],
-  },
-  {
-    id: "o3",
-    num: "#1003",
-    customer: "Sabrina Islam",
-    phone: "01633333333",
-    address: "Zindabazar Chairman Bari, Sylhet",
-    codDue: 5200,
-    status: "confirmed",
-    items: [
-      { productId: "P004", name: "Quilted Shoulder Bag", code: "QSB-004", color: "Pink", size: "M", qty: 2, buyPrice: 1800, sellPrice: 3500, sourceUrl: "https://aliexpress.com/item/QSB004" },
-    ],
-  },
-  {
-    id: "o4",
-    num: "#1004",
-    customer: "Mithila Rahman",
-    phone: "01544444444",
-    address: "Block C, Mirpur 12, Dhaka",
-    codDue: 5900,
-    status: "pending",
-    items: [
-      { productId: "P005", name: "Platform Sneakers", code: "PS-005", color: "Black", size: "37", qty: 1, buyPrice: 1900, sellPrice: 3800, sourceUrl: "https://aliexpress.com/item/PS005" },
-      { productId: "P007", name: "Gold Chain Necklace", code: "GCN-007", color: "Gold", size: "Free", qty: 1, buyPrice: 700, sellPrice: 2100, sourceUrl: "" },
-    ],
-  },
-  {
-    id: "o5",
-    num: "#1005",
-    customer: "Taslima Begum",
-    phone: "01355555555",
-    address: "House 4, Road 9, Banani, Dhaka",
-    codDue: 0,
-    status: "delivered",
-    items: [
-      { productId: "P001", name: "Leather Tote Bag", code: "LTB-001", color: "Brown", size: "L", qty: 1, buyPrice: 1400, sellPrice: 2500, sourceUrl: "https://aliexpress.com/item/LTB001" },
-      { productId: "P002", name: "High Ankle Converse", code: "HAC-002", color: "White", size: "39", qty: 1, buyPrice: 1600, sellPrice: 3200, sourceUrl: "https://aliexpress.com/item/HAC002" },
-    ],
-  },
-  {
-    id: "o6",
-    num: "#1006",
-    customer: "Parvin Sultana",
-    phone: "01566666666",
-    address: "Nasirabad, Chattogram",
-    codDue: 4800,
-    status: "shipped",
-    items: [
-      { productId: "P002", name: "High Ankle Converse", code: "HAC-002", color: "White", size: "39", qty: 1, buyPrice: 1600, sellPrice: 3200, sourceUrl: "https://aliexpress.com/item/HAC002" },
-      { productId: "P006", name: "Canvas Backpack", code: "CB-006", color: "Navy", size: "L", qty: 1, buyPrice: 900, sellPrice: 2400, sourceUrl: "" },
-    ],
-  },
-  {
-    id: "o7",
-    num: "#1007",
-    customer: "Kohinoor Begum",
-    phone: "01677777777",
-    address: "Tongi, Gazipur",
-    codDue: 3500,
-    status: "confirmed",
-    items: [
-      { productId: "P004", name: "Quilted Shoulder Bag", code: "QSB-004", color: "Beige", size: "S", qty: 1, buyPrice: 1800, sellPrice: 3500, sourceUrl: "https://aliexpress.com/item/QSB004" },
-    ],
-  },
-  {
-    id: "o8",
-    num: "#1008",
-    customer: "Nasreen Akter",
-    phone: "01499999999",
-    address: "Badda, Dhaka",
-    codDue: 3800,
-    status: "pending",
-    items: [
-      { productId: "P005", name: "Platform Sneakers", code: "PS-005", color: "White", size: "38", qty: 1, buyPrice: 1900, sellPrice: 3800, sourceUrl: "https://aliexpress.com/item/PS005" },
-    ],
-  },
-  {
-    id: "o9",
-    num: "#1009",
-    customer: "Shirin Akter",
-    phone: "01112345678",
-    address: "Tongi, Gazipur",
-    codDue: 2550,
-    status: "cancelled",
-    items: [
-      { productId: "P006", name: "Canvas Backpack", code: "CB-006", color: "Tan", size: "L", qty: 1, buyPrice: 900, sellPrice: 2400, sourceUrl: "" },
-    ],
-  },
-  {
-    id: "o10",
-    num: "#1010",
-    customer: "Kohinoor Begum",
-    phone: "01987654321",
-    address: "Mohammadpur, Dhaka",
-    codDue: 8580,
-    status: "ordered supplier",
-    items: [
-      { productId: "P005", name: "Platform Sneakers", code: "PS-005", color: "Black", size: "39", qty: 1, buyPrice: 1900, sellPrice: 3800, sourceUrl: "https://aliexpress.com/item/PS005" },
-      { productId: "P008", name: "Ankle Strap Heels", code: "ASH-008", color: "Nude", size: "37", qty: 2, buyPrice: 1100, sellPrice: 2800, sourceUrl: "" },
-    ],
-  },
-];
-
-const INIT_BATCHES: BatchRecord[] = [
-  { id: "b1", batchCode: "BATCH-4421", batchName: "Ali Express Restock April W3", note: "Urgent pre-orders - source from Ali Express Store #4421", orderIds: ["o1", "o2", "o3"], createdAt: "17 Apr 2026, 10:00 AM", createdBy: "Istiak" },
-  { id: "b2", batchCode: "BATCH-8812", batchName: "Regular Stock Orders", note: "Regular stock orders - pack and ship today", orderIds: ["o4", "o5"], createdAt: "16 Apr 2026, 3:30 PM", createdBy: "Rafi" },
-  { id: "b3", batchCode: "BATCH-3301", batchName: "Mixed Restock Batch", note: "", orderIds: ["o6", "o7", "o8"], createdAt: "15 Apr 2026, 11:00 AM", createdBy: "Mitu" },
-];
+const INIT_BATCHES: BatchRecord[] = [];
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof window.localStorage !== "undefined";
@@ -200,7 +70,7 @@ function formatNow(): string {
 
 function readBatchesFromStorage(): BatchRecord[] {
   if (!isBrowser()) {
-    return INIT_BATCHES;
+    return [];
   }
 
   const raw = window.localStorage.getItem(BATCHES_KEY);
@@ -245,12 +115,102 @@ function writeBatchesToStorage(batches: BatchRecord[]): void {
   window.localStorage.setItem(BATCHES_KEY, JSON.stringify(batches));
 }
 
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toBatchOrder(order: Record<string, unknown>): BatchOrder | null {
+  const id = String(order.id || "").trim();
+  if (!id) {
+    return null;
+  }
+
+  const num = String(order.num || id);
+  const customer = String(order.customer || "Unknown Customer");
+  const phone = String(order.phone || "");
+  const address = String(order.address || order.area || "");
+  const status = String(order.status || "pending");
+  const discount = toNumber(order.discount, 0);
+  const discountType = String(order.discType || "flat").toLowerCase();
+  const advance = toNumber(order.advance, 0);
+
+  const rawItems = Array.isArray(order.items) ? order.items : [];
+  const items: BatchOrderItem[] = rawItems
+    .map((item): BatchOrderItem | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const row = item as Record<string, unknown>;
+      const productId = String(row.productId || row.pid || "").trim();
+      const name = String(row.name || "Product");
+      const qty = Math.max(1, toNumber(row.qty, 1));
+      const sellPrice = toNumber(row.sellPrice, toNumber(row.price, 0));
+      const buyPrice = toNumber(row.buyPrice, sellPrice);
+      return {
+        productId: productId || name,
+        name,
+        code: String(row.code || row.pid || row.productId || ""),
+        color: String(row.color || ""),
+        size: String(row.size || ""),
+        qty,
+        buyPrice,
+        sellPrice,
+        sourceUrl: String(row.sourceUrl || ""),
+      };
+    })
+    .filter((item): item is BatchOrderItem => Boolean(item));
+
+  if (!items.length) {
+    return null;
+  }
+
+  const subtotal = items.reduce((sum, item) => sum + item.sellPrice * item.qty, 0);
+  const discounted = discountType === "pct"
+    ? subtotal * (1 - discount / 100)
+    : subtotal - discount;
+  const codDue = Math.max(0, Math.round(discounted - advance));
+
+  return {
+    id,
+    num,
+    customer,
+    phone,
+    address,
+    codDue,
+    status,
+    items,
+  };
+}
+
 function listAvailableOrders(): BatchOrder[] {
-  return MOCK_ORDERS;
+  const liveOrders = loadOrderCollection([])
+    .map((order) => toBatchOrder(order as Record<string, unknown>))
+    .filter((order): order is BatchOrder => Boolean(order));
+
+  return liveOrders;
 }
 
 function listBatches(): BatchRecord[] {
   return readBatchesFromStorage();
+}
+
+function replaceBatches(batches: BatchRecord[]): BatchRecord[] {
+  const next = Array.isArray(batches)
+    ? batches.map((batch) => ({
+      id: String(batch.id || ""),
+      batchCode: String(batch.batchCode || ""),
+      batchName: String(batch.batchName || "Untitled"),
+      note: String(batch.note || ""),
+      orderIds: Array.isArray(batch.orderIds)
+        ? Array.from(new Set(batch.orderIds.map(normalizeOrderId).filter(Boolean)))
+        : [],
+      createdAt: String(batch.createdAt || ""),
+      createdBy: String(batch.createdBy || "Admin"),
+    }))
+    : [];
+  writeBatchesToStorage(next);
+  return next;
 }
 
 function createBatch(payload: CreateBatchPayload = {}): BatchRecord {
@@ -352,6 +312,17 @@ function getSelectedBatchId(): string | null {
   return window.localStorage.getItem(SELECTED_BATCH_KEY);
 }
 
+function setSelectedBatchId(batchId: string | null): void {
+  if (!isBrowser()) {
+    return;
+  }
+  if (!batchId) {
+    window.localStorage.removeItem(SELECTED_BATCH_KEY);
+    return;
+  }
+  window.localStorage.setItem(SELECTED_BATCH_KEY, String(batchId));
+}
+
 export {
   assignOrdersToBatch,
   createBatch,
@@ -359,6 +330,8 @@ export {
   getSelectedBatchId,
   listAvailableOrders,
   listBatches,
+  replaceBatches,
+  setSelectedBatchId,
   selectBatch,
 };
 export type { BatchMembershipEntry, BatchOrder, BatchOrderItem, BatchRecord, CreateBatchPayload };

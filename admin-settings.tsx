@@ -1,7 +1,8 @@
-import { useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import AdminSidebar from "./core/admin-sidebar";
 import { loadSession } from "./core/auth-session";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#FFFFFF", ib:"rgba(0,0,0,0.1)", accent:"#6366F1" };
@@ -12,6 +13,7 @@ const TABS = [
   { id:"general",   icon:"🏪", label:"General"       },
   { id:"delivery",  icon:"🚚", label:"Delivery"       },
   { id:"payment",   icon:"💳", label:"bKash & Nagad"  },
+  { id:"api-health",icon:"🩺", label:"API Health"     },
   { id:"preorder",  icon:"⏳", label:"Pre-Order"      },
   { id:"sms",       icon:"📲", label:"SMS"            },
   { id:"whatsapp",  icon:"💬", label:"WhatsApp"       },
@@ -22,6 +24,14 @@ const TABS = [
 ];
 
 const DAYS = ["Saturday","Sunday","Monday","Tuesday","Wednesday","Thursday","Friday"];
+
+function normalizeBdPhoneInput(value: string): string {
+  return String(value || "").replace(/\D/g, "").slice(0, 11);
+}
+
+function isValidBdPhone(value: string): boolean {
+  return /^01\d{9}$/.test(String(value || ""));
+}
 
 // ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 
@@ -123,14 +133,32 @@ function ApiField({ label, value, onChange, placeholder = "", T, masked = false 
   );
 }
 
-function SaveBtn({ onSave = () => {}, T }: { onSave?: () => void; T: any }) {
+function SaveBtn({ onSave = async () => {}, T }: { onSave?: () => Promise<void> | void; T: any }) {
   const [saved, setSaved] = useState(false);
-  const handle = () => { onSave(); setSaved(true); setTimeout(() => setSaved(false), 2000); };
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const handle = async () => {
+    if (saving) return;
+    setError("");
+    setSaving(true);
+    try {
+      await onSave();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err: any) {
+      setError(String(err?.message || "Save failed. Please try again."));
+    } finally {
+      setSaving(false);
+    }
+  };
   return (
-    <button onClick={handle}
-      style={{ background:saved?"#059669":T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px 28px", fontSize:"13px", fontWeight:700, cursor:"pointer", transition:"background 0.2s" }}>
-      {saved ? "✓ Saved!" : "Save Changes"}
-    </button>
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:"6px" }}>
+      <button onClick={handle}
+        style={{ background:saved?"#059669":saving?"#475569":T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px 28px", fontSize:"13px", fontWeight:700, cursor:saving?"not-allowed":"pointer", transition:"background 0.2s" }}>
+        {saved ? "✓ Saved!" : saving ? "Saving..." : "Save Changes"}
+      </button>
+      {error && <div style={{ fontSize:"11px", color:"#DC2626" }}>{error}</div>}
+    </div>
   );
 }
 
@@ -148,11 +176,87 @@ function GeneralSettings({ T }: { T: any }) {
   const [storeName,  setStoreName]  = useState("ShopAdmin");
   const [tagline,    setTagline]    = useState("Ladies Fashion BD");
   const [email,      setEmail]      = useState("admin@yourshop.com");
-  const [phone,      setPhone]      = useState("01XXXXXXXXX");
-  const [whatsapp,   setWhatsapp]   = useState("01XXXXXXXXX");
+  const [phone,      setPhone]      = useState("");
+  const [whatsapp,   setWhatsapp]   = useState("");
   const [address,    setAddress]    = useState("");
   const [currency,   setCurrency]   = useState("BDT");
   const [domain,     setDomain]     = useState("yourshop.com");
+  const [logoUrl,    setLogoUrl]    = useState("");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoRef = useRef<HTMLInputElement | null>(null);
+  const phoneInvalid = phone.length > 0 && !isValidBdPhone(phone);
+  const whatsappInvalid = whatsapp.length > 0 && !isValidBdPhone(whatsapp);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.general", {
+        storeName: "ShopAdmin",
+        tagline: "Ladies Fashion BD",
+        email: "admin@yourshop.com",
+        phone: "",
+        whatsapp: "",
+        address: "",
+        currency: "BDT",
+        domain: "yourshop.com",
+        logoUrl: "",
+      });
+      if (cancelled) return;
+      setStoreName(String(data.storeName || "ShopAdmin"));
+      setTagline(String(data.tagline || "Ladies Fashion BD"));
+      setEmail(String(data.email || "admin@yourshop.com"));
+      setPhone(String(data.phone || ""));
+      setWhatsapp(String(data.whatsapp || ""));
+      setAddress(String(data.address || ""));
+      setCurrency(String(data.currency || "BDT"));
+      setDomain(String(data.domain || "yourshop.com"));
+      setLogoUrl(String(data.logoUrl || ""));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const uploadLogo = async (file: File | null) => {
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Failed to read logo file."));
+        reader.readAsDataURL(file);
+      });
+
+      const res = await fetch("/api/r2-upload", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type || "image/png", dataUrl, folder: "shop-logo" }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Logo upload failed.");
+      const nextUrl = String(payload?.url || "");
+      if (!nextUrl) throw new Error("Upload did not return logo URL.");
+      setLogoUrl(nextUrl);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleSave = async () => {
+    await saveAppState("settings.general", {
+      storeName,
+      tagline,
+      email,
+      phone,
+      whatsapp,
+      address,
+      currency,
+      domain,
+      logoUrl,
+    });
+  };
   return (
     <div>
       <Card title="Store Identity" icon="🏪" T={T}>
@@ -163,8 +267,11 @@ function GeneralSettings({ T }: { T: any }) {
         <div style={{ marginBottom:"14px" }}>
           <SL c="Store Logo" T={T} sub="Shown on website header, invoices, and receipts"/>
           <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-            <div style={{ width:"64px", height:"64px", borderRadius:"12px", background:"linear-gradient(135deg,#6366F1,#A855F7)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"28px", flexShrink:0 }}>🛍️</div>
-            <button style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"8px", padding:"9px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Upload Logo</button>
+            <div style={{ width:"64px", height:"64px", borderRadius:"12px", background:"linear-gradient(135deg,#6366F1,#A855F7)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"28px", flexShrink:0, overflow:"hidden" }}>
+              {logoUrl ? <img src={logoUrl} alt="Store logo" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : "🛍️"}
+            </div>
+            <button onClick={() => logoRef.current?.click()} style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"8px", padding:"9px 16px", fontSize:"12px", fontWeight:700, cursor:uploadingLogo?"not-allowed":"pointer" }}>{uploadingLogo ? "Uploading..." : "Upload Logo"}</button>
+            <input ref={logoRef} type="file" accept="image/*" style={{ display:"none" }} onChange={(e) => uploadLogo(e.target.files?.[0] ?? null)} />
             <span style={{ fontSize:"11px", color:T.textMuted }}>PNG or JPG, max 2MB, recommended 200×200px</span>
           </div>
         </div>
@@ -177,15 +284,23 @@ function GeneralSettings({ T }: { T: any }) {
       <Card title="Contact Information" icon="📞" T={T} sub="Shown to customers and used for notifications">
         <Row T={T}>
           <div><SL c="Contact Email" T={T}/><Inp value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@yourshop.com" T={T} type="email"/></div>
-          <div><SL c="Contact Phone" T={T}/><Inp value={phone} onChange={e=>setPhone(e.target.value)} placeholder="01XXXXXXXXX" T={T}/></div>
+          <div>
+            <SL c="Contact Phone" T={T}/>
+            <Inp value={phone} onChange={e=>setPhone(normalizeBdPhoneInput(e.target.value))} placeholder="01XXXXXXXXX" T={T}/>
+            {phoneInvalid && <div style={{ marginTop:"6px", fontSize:"11px", color:"#DC2626" }}>Enter a valid Bangladesh phone number (11 digits, starts with 01).</div>}
+          </div>
         </Row>
         <Row T={T}>
-          <div><SL c="WhatsApp Business Number" T={T}/><Inp value={whatsapp} onChange={e=>setWhatsapp(e.target.value)} placeholder="01XXXXXXXXX" T={T}/></div>
+          <div>
+            <SL c="WhatsApp Business Number" T={T}/>
+            <Inp value={whatsapp} onChange={e=>setWhatsapp(normalizeBdPhoneInput(e.target.value))} placeholder="01XXXXXXXXX" T={T}/>
+            {whatsappInvalid && <div style={{ marginTop:"6px", fontSize:"11px", color:"#DC2626" }}>Enter a valid Bangladesh phone number (11 digits, starts with 01).</div>}
+          </div>
           <div><SL c="Store / Warehouse Address" T={T}/><Inp value={address} onChange={e=>setAddress(e.target.value)} placeholder="Full address" T={T}/></div>
         </Row>
       </Card>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -196,6 +311,33 @@ function DeliverySettings({ T }: { T: any }) {
   const [freeOver,  setFreeOver]  = useState("");
   const [freeShip,  setFreeShip]  = useState(false);
   const [codNote,   setCodNote]   = useState("Please keep the exact amount ready at the time of delivery.");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.delivery", {
+        inDhaka: "80",
+        outDhaka: "150",
+        freeOver: "",
+        freeShip: false,
+        codNote: "Please keep the exact amount ready at the time of delivery.",
+      });
+      if (cancelled) return;
+      setInDhaka(String(data.inDhaka || "80"));
+      setOutDhaka(String(data.outDhaka || "150"));
+      setFreeOver(String(data.freeOver || ""));
+      setFreeShip(Boolean(data.freeShip));
+      setCodNote(String(data.codNote || "Please keep the exact amount ready at the time of delivery."));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.delivery", { inDhaka, outDhaka, freeOver, freeShip, codNote });
+  };
   return (
     <div>
       <InfoBanner text="💡 These delivery charges are the single source of truth — they apply across the admin panel, website checkout, and all COD calculations automatically." color="#6366F1" T={T}/>
@@ -232,7 +374,7 @@ function DeliverySettings({ T }: { T: any }) {
         </div>
       </Card>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -247,13 +389,61 @@ function PaymentSettings({ T }: { T: any }) {
   const [bkashAppKey, setBkashAppKey] = useState("");
   const [bkashSecret, setBkashSecret] = useState("");
   const [bkashApiEnabled, setBkashApiEnabled] = useState(false);
+  const bkashNumInvalid = bkashNum.length > 0 && !isValidBdPhone(bkashNum);
+  const nagadNumInvalid = nagadNum.length > 0 && !isValidBdPhone(nagadNum);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.payment", {
+        bkashNum: "",
+        bkashType: "personal",
+        bkashNote: "Send payment to bKash number below and use your Order ID as the reference.",
+        nagadNum: "",
+        nagadNote: "",
+        bkashApiKey: "",
+        bkashAppKey: "",
+        bkashSecret: "",
+        bkashApiEnabled: false,
+      });
+      if (cancelled) return;
+      setBkashNum(String(data.bkashNum || ""));
+      setBkashType(String(data.bkashType || "personal"));
+      setBkashNote(String(data.bkashNote || "Send payment to bKash number below and use your Order ID as the reference."));
+      setNagadNum(String(data.nagadNum || ""));
+      setNagadNote(String(data.nagadNote || ""));
+      setBkashApiKey(String(data.bkashApiKey || ""));
+      setBkashAppKey(String(data.bkashAppKey || ""));
+      setBkashSecret(String(data.bkashSecret || ""));
+      setBkashApiEnabled(Boolean(data.bkashApiEnabled));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.payment", {
+      bkashNum,
+      bkashType,
+      bkashNote,
+      nagadNum,
+      nagadNote,
+      bkashApiKey,
+      bkashAppKey,
+      bkashSecret,
+      bkashApiEnabled,
+    });
+  };
   return (
     <div>
       <Card title="Manual bKash" icon="💳" T={T} sub="Customer sends payment manually, agent verifies TxID">
         <Row T={T}>
           <div>
             <SL c="bKash Number" T={T} req/>
-            <Inp value={bkashNum} onChange={e=>setBkashNum(e.target.value)} placeholder="01XXXXXXXXX" T={T}/>
+            <Inp value={bkashNum} onChange={e=>setBkashNum(normalizeBdPhoneInput(e.target.value))} placeholder="01XXXXXXXXX" T={T}/>
+            {bkashNumInvalid && <div style={{ marginTop:"6px", fontSize:"11px", color:"#DC2626" }}>bKash number must be 11 digits and start with 01.</div>}
           </div>
           <div>
             <SL c="Account Type" T={T}/>
@@ -289,7 +479,8 @@ function PaymentSettings({ T }: { T: any }) {
       <Card title="Nagad" icon="📱" T={T}>
         <div>
           <SL c="Nagad Number" T={T}/>
-          <Inp value={nagadNum} onChange={e=>setNagadNum(e.target.value)} placeholder="01XXXXXXXXX" T={T}/>
+          <Inp value={nagadNum} onChange={e=>setNagadNum(normalizeBdPhoneInput(e.target.value))} placeholder="01XXXXXXXXX" T={T}/>
+          {nagadNumInvalid && <div style={{ marginTop:"6px", fontSize:"11px", color:"#DC2626" }}>Nagad number must be 11 digits and start with 01.</div>}
         </div>
         <div style={{ marginTop:"14px" }}>
           <SL c="Payment Instruction for Customers" T={T}/>
@@ -297,7 +488,7 @@ function PaymentSettings({ T }: { T: any }) {
         </div>
       </Card>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -311,6 +502,48 @@ function PreOrderSettings({ T }: { T: any }) {
   const [delayNote,      setDelayNote]      = useState("Your order has been slightly delayed. We apologise for the inconvenience and will update you soon.");
   const [arrivalNote,    setArrivalNote]    = useState("Great news! Your order has arrived in Bangladesh and will be dispatched shortly.");
   const [autoNotify,     setAutoNotify]     = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.preorder", {
+        defaultETA: "30",
+        advancePct: "20",
+        advanceType: "pct",
+        advanceFlat: "500",
+        orderNote: "This is a pre-order item. Expected delivery in approximately 30 days after order confirmation.",
+        delayNote: "Your order has been slightly delayed. We apologise for the inconvenience and will update you soon.",
+        arrivalNote: "Great news! Your order has arrived in Bangladesh and will be dispatched shortly.",
+        autoNotify: true,
+      });
+      if (cancelled) return;
+      setDefaultETA(String(data.defaultETA || "30"));
+      setAdvancePct(String(data.advancePct || "20"));
+      setAdvanceType(String(data.advanceType || "pct"));
+      setAdvanceFlat(String(data.advanceFlat || "500"));
+      setOrderNote(String(data.orderNote || "This is a pre-order item. Expected delivery in approximately 30 days after order confirmation."));
+      setDelayNote(String(data.delayNote || "Your order has been slightly delayed. We apologise for the inconvenience and will update you soon."));
+      setArrivalNote(String(data.arrivalNote || "Great news! Your order has arrived in Bangladesh and will be dispatched shortly."));
+      setAutoNotify(Boolean(data.autoNotify));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.preorder", {
+      defaultETA,
+      advancePct,
+      advanceType,
+      advanceFlat,
+      orderNote,
+      delayNote,
+      arrivalNote,
+      autoNotify,
+    });
+  };
   return (
     <div>
       <Card title="Default Pre-Order Settings" icon="⏳" T={T} sub="These defaults apply to all pre-orders unless overridden per product">
@@ -360,7 +593,7 @@ function PreOrderSettings({ T }: { T: any }) {
         </div>
       </Card>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -374,6 +607,48 @@ function SmsSettings({ T }: { T: any }) {
   const [tplShipped, setTplShipped] = useState("Your order {order_id} has been shipped and is on its way. Track: {tracking_link}");
   const [tplDeliver, setTplDeliver] = useState("Your order {order_id} has been delivered. Thank you for shopping with us!");
   const [tplPreConf, setTplPreConf] = useState("Your pre-order {order_id} is confirmed! Expected delivery in {eta_days} days. We'll update you at each step.");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.sms", {
+        provider: "sslwireless",
+        apiKey: "",
+        senderId: "",
+        smsEnabled: true,
+        tplOrder: "Your order {order_id} has been confirmed. COD due: ৳{cod_amount}. Track: {tracking_link}",
+        tplShipped: "Your order {order_id} has been shipped and is on its way. Track: {tracking_link}",
+        tplDeliver: "Your order {order_id} has been delivered. Thank you for shopping with us!",
+        tplPreConf: "Your pre-order {order_id} is confirmed! Expected delivery in {eta_days} days. We'll update you at each step.",
+      });
+      if (cancelled) return;
+      setProvider(String(data.provider || "sslwireless"));
+      setApiKey(String(data.apiKey || ""));
+      setSenderId(String(data.senderId || ""));
+      setSmsEnabled(Boolean(data.smsEnabled));
+      setTplOrder(String(data.tplOrder || "Your order {order_id} has been confirmed. COD due: ৳{cod_amount}. Track: {tracking_link}"));
+      setTplShipped(String(data.tplShipped || "Your order {order_id} has been shipped and is on its way. Track: {tracking_link}"));
+      setTplDeliver(String(data.tplDeliver || "Your order {order_id} has been delivered. Thank you for shopping with us!"));
+      setTplPreConf(String(data.tplPreConf || "Your pre-order {order_id} is confirmed! Expected delivery in {eta_days} days. We'll update you at each step."));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.sms", {
+      provider,
+      apiKey,
+      senderId,
+      smsEnabled,
+      tplOrder,
+      tplShipped,
+      tplDeliver,
+      tplPreConf,
+    });
+  };
   return (
     <div>
       <Card title="SMS Provider" icon="📲" T={T}>
@@ -420,7 +695,7 @@ function SmsSettings({ T }: { T: any }) {
         </Card>
       )}
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -432,6 +707,35 @@ function WhatsAppSettings({ T }: { T: any }) {
   const [businessId, setBusinessId] = useState("");
   const [tplOrder,   setTplOrder]   = useState("Hello {customer_name}! Your order *{order_id}* is confirmed ✅\n\nTotal: ৳{total}\nCOD due: ৳{cod_amount}\n\nTrack your order: {tracking_link}");
   const [tplShipped, setTplShipped] = useState("Hello {customer_name}! Your order *{order_id}* is on its way 🚚\n\nTrack here: {tracking_link}");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.whatsapp", {
+        enabled: false,
+        token: "",
+        phoneId: "",
+        businessId: "",
+        tplOrder: "Hello {customer_name}! Your order *{order_id}* is confirmed ✅\n\nTotal: ৳{total}\nCOD due: ৳{cod_amount}\n\nTrack your order: {tracking_link}",
+        tplShipped: "Hello {customer_name}! Your order *{order_id}* is on its way 🚚\n\nTrack here: {tracking_link}",
+      });
+      if (cancelled) return;
+      setEnabled(Boolean(data.enabled));
+      setToken(String(data.token || ""));
+      setPhoneId(String(data.phoneId || ""));
+      setBusinessId(String(data.businessId || ""));
+      setTplOrder(String(data.tplOrder || "Hello {customer_name}! Your order *{order_id}* is confirmed ✅\n\nTotal: ৳{total}\nCOD due: ৳{cod_amount}\n\nTrack your order: {tracking_link}"));
+      setTplShipped(String(data.tplShipped || "Hello {customer_name}! Your order *{order_id}* is on its way 🚚\n\nTrack here: {tracking_link}"));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.whatsapp", { enabled, token, phoneId, businessId, tplOrder, tplShipped });
+  };
   return (
     <div>
       <Card title="WhatsApp Business API (Meta Cloud)" icon="💬" T={T}>
@@ -464,7 +768,7 @@ function WhatsAppSettings({ T }: { T: any }) {
         </Card>
       )}
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -479,6 +783,51 @@ function PathaoSettings({ T }: { T: any }) {
   const [sandbox,   setSandbox]   = useState(true);
   const [autoShip,  setAutoShip]  = useState(false);
   const [pickupHub, setPickupHub] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.pathao", {
+        enabled: false,
+        clientId: "",
+        secret: "",
+        username: "",
+        password: "",
+        storeId: "",
+        sandbox: true,
+        autoShip: false,
+        pickupHub: "",
+      });
+      if (cancelled) return;
+      setEnabled(Boolean(data.enabled));
+      setClientId(String(data.clientId || ""));
+      setSecret(String(data.secret || ""));
+      setUsername(String(data.username || ""));
+      setPassword(String(data.password || ""));
+      setStoreId(String(data.storeId || ""));
+      setSandbox(Boolean(data.sandbox));
+      setAutoShip(Boolean(data.autoShip));
+      setPickupHub(String(data.pickupHub || ""));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.pathao", {
+      enabled,
+      clientId,
+      secret,
+      username,
+      password,
+      storeId,
+      sandbox,
+      autoShip,
+      pickupHub,
+    });
+  };
   return (
     <div>
       <Card title="Pathao Courier API" icon="🚴" T={T} sub="Auto-create shipments, fetch delivery areas, and track orders via Pathao">
@@ -508,7 +857,7 @@ function PathaoSettings({ T }: { T: any }) {
         )}
       </Card>
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -521,6 +870,25 @@ function StoreHoursSettings({ T }: { T: any }) {
   const [hours, setHours] = useState(initHours);
   const setDay = (day: string, field: "open" | "from" | "to", val: boolean | string) => setHours((p) => ({ ...p, [day]: { ...p[day], [field]: val } }));
   const timeInput: CSSProperties = { background:"transparent", border:`1px solid ${T.border}`, borderRadius:"6px", color:T.text, padding:"6px 9px", fontSize:"12px", outline:"none", fontFamily:"inherit", width:"100px" };
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.hours", initHours);
+      if (cancelled) return;
+      if (data && typeof data === "object") {
+        setHours(data as any);
+      }
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.hours", hours);
+  };
   return (
     <div>
       <Card title="Business Hours" icon="🕐" T={T} sub="Shown to customers on your website. Order processing follows these hours.">
@@ -548,7 +916,7 @@ function StoreHoursSettings({ T }: { T: any }) {
           ))}
         </div>
       </Card>
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -561,6 +929,45 @@ function ReturnSettings({ T }: { T: any }) {
   const [conditions,     setConditions]     = useState("Items must be unused, unworn, and in original packaging. Tags must be attached. Sale items are not eligible for returns.");
   const [process,        setProcess]        = useState("Contact us via WhatsApp or phone within the return window. We will arrange pickup or ask you to ship the item back.");
   const [noReturn,       setNoReturn]       = useState("Sale/discounted items\nUnderwear and swimwear\nPersonalised or custom orders");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.returns", {
+        returnEnabled: true,
+        returnDays: "7",
+        exchangeOnly: false,
+        refundMethod: "bkash",
+        conditions: "Items must be unused, unworn, and in original packaging. Tags must be attached. Sale items are not eligible for returns.",
+        process: "Contact us via WhatsApp or phone within the return window. We will arrange pickup or ask you to ship the item back.",
+        noReturn: "Sale/discounted items\nUnderwear and swimwear\nPersonalised or custom orders",
+      });
+      if (cancelled) return;
+      setReturnEnabled(Boolean(data.returnEnabled));
+      setReturnDays(String(data.returnDays || "7"));
+      setExchangeOnly(Boolean(data.exchangeOnly));
+      setRefundMethod(String(data.refundMethod || "bkash"));
+      setConditions(String(data.conditions || ""));
+      setProcess(String(data.process || ""));
+      setNoReturn(String(data.noReturn || ""));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.returns", {
+      returnEnabled,
+      returnDays,
+      exchangeOnly,
+      refundMethod,
+      conditions,
+      process,
+      noReturn,
+    });
+  };
   return (
     <div>
       <Card title="Return & Exchange Policy" icon="↩️" T={T}>
@@ -608,7 +1015,7 @@ function ReturnSettings({ T }: { T: any }) {
         </Card>
       )}
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -624,6 +1031,54 @@ function AbandonedCartSettings({ T }: { T: any }) {
   const [promoDisc,    setPromoDisc]    = useState("10");
   const [msg1, setMsg1] = useState("Hi {customer_name}! You left something in your cart 🛍️ Complete your order here: {cart_link}");
   const [msg2, setMsg2] = useState("Hi {customer_name}! Your cart is still waiting. Here's a special discount just for you: {promo_code} — {cart_link}");
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("settings.abandoned", {
+        enabled: true,
+        delay: "60",
+        reminder2: true,
+        delay2: "24",
+        channel: "sms",
+        promoEnabled: false,
+        promoCode: "",
+        promoDisc: "10",
+        msg1: "Hi {customer_name}! You left something in your cart 🛍️ Complete your order here: {cart_link}",
+        msg2: "Hi {customer_name}! Your cart is still waiting. Here's a special discount just for you: {promo_code} — {cart_link}",
+      });
+      if (cancelled) return;
+      setEnabled(Boolean(data.enabled));
+      setDelay(String(data.delay || "60"));
+      setReminder2(Boolean(data.reminder2));
+      setDelay2(String(data.delay2 || "24"));
+      setChannel(String(data.channel || "sms"));
+      setPromoEnabled(Boolean(data.promoEnabled));
+      setPromoCode(String(data.promoCode || ""));
+      setPromoDisc(String(data.promoDisc || "10"));
+      setMsg1(String(data.msg1 || ""));
+      setMsg2(String(data.msg2 || ""));
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSave = async () => {
+    await saveAppState("settings.abandoned", {
+      enabled,
+      delay,
+      reminder2,
+      delay2,
+      channel,
+      promoEnabled,
+      promoCode,
+      promoDisc,
+      msg1,
+      msg2,
+    });
+  };
   return (
     <div>
       <Card title="Abandoned Cart Recovery" icon="⊡" T={T} sub="Automatically follow up with customers who added items but didn't complete their order">
@@ -690,7 +1145,7 @@ function AbandonedCartSettings({ T }: { T: any }) {
         </>
       )}
 
-      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={()=>{}} T={T}/></div>
+      <div style={{ display:"flex", justifyContent:"flex-end" }}><SaveBtn onSave={handleSave} T={T}/></div>
     </div>
   );
 }
@@ -754,7 +1209,13 @@ export default function SettingsPage() {
           {/* Settings tab sidebar */}
           <div style={{ width:"200px", background:T.sidebar, borderRight:`1px solid ${T.border}`, padding:"10px 8px", flexShrink:0, overflowY:"auto" }}>
             {TABS.map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              <button key={tab.id} onClick={() => {
+                if (tab.id === "api-health") {
+                  navigateByAdminNavLabel("API Health");
+                  return;
+                }
+                setActiveTab(tab.id);
+              }}
                 style={{ width:"100%", display:"flex", alignItems:"center", gap:"9px", padding:"9px 10px", borderRadius:"8px", border:"none", cursor:"pointer", marginBottom:"2px", background:activeTab===tab.id?T.accent+"18":"transparent", color:activeTab===tab.id?T.accent:T.textMuted, textAlign:"left", transition:"all 0.12s" }}>
                 <span style={{ fontSize:"15px", width:"18px", textAlign:"center", flexShrink:0 }}>{tab.icon}</span>
                 <span style={{ fontSize:"12px", fontWeight:activeTab===tab.id?700:400 }}>{tab.label}</span>

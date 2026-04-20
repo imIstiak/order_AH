@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
-import { appendTimelineEvent, loadOrderCollection, saveOrderCollection } from "./core/order-store";
+import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
 import { loadSession } from "./core/auth-session";
 
 const DARK = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
@@ -18,12 +18,28 @@ export default function AdminBkashVerificationPage() {
   const [dark, setDark] = useState(false);
   const T = dark ? DARK : LIGHT;
   const [orders, setOrders] = useState(() => loadOrderCollection([]));
+  const [ordersHydrated, setOrdersHydrated] = useState(false);
   const [nav, setNav] = useState(1);
   const sessionUser = loadSession()?.user;
 
   useEffect(() => {
-    saveOrderCollection(orders as any);
-  }, [orders]);
+    let cancelled = false;
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer([]);
+      if (cancelled) return;
+      setOrders(synced as any);
+      setOrdersHydrated(true);
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ordersHydrated) return;
+    persistOrderCollectionToServer(orders as any);
+  }, [orders, ordersHydrated]);
 
   const bkashOrders = orders.filter((o: any) =>
     String(o.pay || "").toLowerCase().includes("bkash") &&

@@ -1,0 +1,116 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: shopadmin_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d shopadmin_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MIGRATION_DATABASE_URL: postgres://postgres:postgres@localhost:5432/shopadmin_ci
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Enforce schema + migration policy
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          MIGRATION_DIFF="$(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- database/migrations || true)"
+
+          IMMUTABLE_VIOLATIONS="$(printf '%s\n' "$MIGRATION_DIFF" | awk 'NF && $1 != "A" { print }' || true)"
+          if [ -n "$IMMUTABLE_VIOLATIONS" ]; then
+            echo "Existing migrations are immutable. Only new files may be added in database/migrations/."
+            printf '%s\n' "$IMMUTABLE_VIOLATIONS"
+            exit 1
+          fi
+
+          ADDED_MIGRATIONS="$(printf '%s\n' "$MIGRATION_DIFF" | awk '$1 == "A" { print $2 }' || true)"
+          INVALID_ADDS=""
+
+          if [ -n "$ADDED_MIGRATIONS" ]; then
+            INVALID_ADDS="$(printf '%s\n' "$ADDED_MIGRATIONS" | grep -Ev '^database/migrations/[0-9]{8}_[0-9]{3}_[a-z0-9_]+(\.rollback)?\.sql$' || true)"
+          fi
+
+          if [ -n "$INVALID_ADDS" ]; then
+            echo "Added files in database/migrations/ must use migration naming format only."
+            printf '%s\n' "$INVALID_ADDS"
+            exit 1
+          fi
+
+          ADDED_FORWARD_MIGRATIONS="$(printf '%s\n' "$ADDED_MIGRATIONS" | grep -E '^database/migrations/.*\.sql$' | grep -Ev '\.rollback\.sql$' || true)"
+          ADDED_ROLLBACK_MIGRATIONS="$(printf '%s\n' "$ADDED_MIGRATIONS" | grep -E '^database/migrations/.*\.rollback\.sql$' || true)"
+
+          for forward in $ADDED_FORWARD_MIGRATIONS; do
+            rollback="${forward%.sql}.rollback.sql"
+            if ! printf '%s\n' "$ADDED_MIGRATIONS" | grep -qx "$rollback"; then
+              echo "Missing rollback pair for forward migration: $forward"
+              echo "Expected rollback file: $rollback"
+              exit 1
+            fi
+          done
+
+          for rollback in $ADDED_ROLLBACK_MIGRATIONS; do
+            forward="${rollback%.rollback.sql}.sql"
+            if ! printf '%s\n' "$ADDED_MIGRATIONS" | grep -qx "$forward"; then
+              echo "Rollback migration added without matching forward migration: $rollback"
+              echo "Expected forward file: $forward"
+              exit 1
+            fi
+          done
+
+          if git diff --name-only "$BASE_SHA" "$HEAD_SHA" | grep -q '^database/schema.sql$'; then
+            if [ -z "$ADDED_FORWARD_MIGRATIONS" ]; then
+              echo "database/schema.sql changed, but no new forward migration file was added in database/migrations/."
+              exit 1
+            fi
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Prepare test database schema
+        run: psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -f database/schema.sql
+
+      - name: Migration dry-run
+        run: npm run db:migrate

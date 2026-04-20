@@ -18,6 +18,7 @@ import AdminProfilePage from "./admin-profile";
 import AdminAnalyticsPage from "./admin-analytics";
 import AdminBkashVerificationPage from "./admin-bkash-verification";
 import AdminOrderIssuesPage from "./admin-order-issues";
+import AdminApiHealthPage from "./admin-api-health";
 import AgentDashboardPage from "./agent-dashboard";
 import AgentProfilePage from "./agent-profile";
 import CustomerTrackingPage from "./customer-tracking";
@@ -49,6 +50,7 @@ const ROUTES: Record<string, RouteMeta> = {
   "/admin/analytics": { component: AdminAnalyticsPage, public: false, roles: ["admin"] },
   "/admin/bkash-verification": { component: AdminBkashVerificationPage, public: false, roles: ["admin"] },
   "/admin/order-issues": { component: AdminOrderIssuesPage, public: false, roles: ["admin"] },
+  "/admin/api-health": { component: AdminApiHealthPage, public: false, roles: ["admin"] },
   "/admin/profile": { component: AdminProfilePage, public: false, roles: ["admin"] },
   "/admin/progfile": { component: AdminProfilePage, public: false, roles: ["admin"] },
   "/admin/settings": { component: AdminSettingsPage, public: false, roles: ["admin"] },

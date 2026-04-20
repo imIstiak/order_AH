@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { getRouteForLabel, navigateByAdminNavLabel } from "./core/nav-routes";
 import { loadSession } from "./core/auth-session";
-import { appendTimelineEvent, loadOrderCollection, saveOrderCollection } from "./core/order-store";
+import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
 import AdminSidebar from "./core/admin-sidebar";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
@@ -119,69 +119,6 @@ type BarChartProps = {
 };
 
 const NAV: Array<[string, string]> = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
-
-const REVENUE_BARS: RevenuePoint[] = [
-  { day:"Apr 11", revenue:12400, orders:5,  profit:5200 },
-  { day:"Apr 12", revenue:8700,  orders:3,  profit:3600 },
-  { day:"Apr 13", revenue:19800, orders:8,  profit:8400 },
-  { day:"Apr 14", revenue:15200, orders:6,  profit:6400 },
-  { day:"Apr 15", revenue:22600, orders:9,  profit:9800 },
-  { day:"Apr 16", revenue:11300, orders:4,  profit:4700 },
-  { day:"Apr 17", revenue:18500, orders:7,  profit:7800 },
-];
-
-const PENDING_VERIFY: PendingVerify[] = [
-  { num:"#1006", customer:"Taslima Begum",  phone:"01312345678", amount:600,  txId:"BK2025041301", fraud:"high",   time:"2h ago" },
-  { num:"#1012", customer:"Nasreen Akter",  phone:"01412345678", amount:400,  txId:"BK2025041703", fraud:"low",    time:"45m ago" },
-  { num:"#1015", customer:"Ruma Islam",     phone:"01512345678", amount:800,  txId:"BK2025041709", fraud:"medium", time:"12m ago" },
-];
-
-const OPEN_ISSUES: OpenIssue[] = [
-  { num:"#1004", customer:"Sabrina Islam",  issue:"Customer threatening cancellation. Needs follow-up call.", status:"Delayed",     severity:"high" },
-  { num:"#1006", customer:"Taslima Begum",  issue:"Possible fake TxID — high risk. Verify manually.",         status:"Pend. Verify", severity:"high" },
-];
-
-const RECENT_ORDERS: RecentOrder[] = [
-  { num:"#1015", customer:"Ruma Islam",      source:"📸", type:"preorder", status:"Pend. Verify",     amount:2200, time:"12m ago",    statusColor:"#D97706" },
-  { num:"#1014", customer:"Dilruba Hossain", source:"📘", type:"stock",    status:"Confirmed",        amount:3500, time:"34m ago",    statusColor:"#059669" },
-  { num:"#1013", customer:"Suma Begum",      source:"🌐", type:"stock",    status:"Confirmed",        amount:2400, time:"1h ago",     statusColor:"#059669" },
-  { num:"#1012", customer:"Nasreen Akter",   source:"💬", type:"preorder", status:"Advance Paid",     amount:3200, time:"2h ago",     statusColor:"#6366F1" },
-  { num:"#1011", customer:"Parvin Sultana",  source:"📘", type:"stock",    status:"Shipped",          amount:1800, time:"3h ago",     statusColor:"#2563EB" },
-  { num:"#1010", customer:"Kohinoor Begum",  source:"📸", type:"preorder", status:"Ordered Supplier", amount:9400, time:"yesterday",  statusColor:"#D97706" },
-];
-
-const MOST_ORDERED: MostOrdered[] = [
-  { rank:1, name:"Leather Tote Bag",      cat:"Bags",        img:"🛍️", bg:"#92400E", orders:24, revenue:60000, topVar:"M - Black" },
-  { rank:2, name:"High Ankle Converse",   cat:"Shoes",       img:"👟", bg:"#1E40AF", orders:19, revenue:60800, topVar:"38 - White" },
-  { rank:3, name:"Quilted Shoulder Bag",  cat:"Bags",        img:"👜", bg:"#9D174D", orders:16, revenue:56000, topVar:"M - Pink" },
-  { rank:4, name:"Platform Sneakers",     cat:"Shoes",       img:"👠", bg:"#7C3AED", orders:14, revenue:53200, topVar:"37 - Black" },
-  { rank:5, name:"Canvas Backpack",       cat:"Bags",        img:"🎒", bg:"#065F46", orders:12, revenue:28800, topVar:"L - Olive" },
-  { rank:6, name:"Silver Bracelet",       cat:"Accessories", img:"📿", bg:"#6B21A8", orders:11, revenue:19800, topVar:"Free - Silver" },
-  { rank:7, name:"Ankle Strap Heels",     cat:"Shoes",       img:"🥿", bg:"#B45309", orders:9,  revenue:25200, topVar:"37 - Black" },
-  { rank:8, name:"Embroidered Clutch",    cat:"Bags",        img:"👝", bg:"#B91C1C", orders:7,  revenue:15400, topVar:"Free - Red" },
-];
-
-const SOURCE_DATA: SourceData[] = [
-  { name:"Facebook",  orders:32, revenue:78600, color:"#1877F2", icon:"📘" },
-  { name:"Instagram", orders:28, revenue:68200, color:"#E1306C", icon:"📸" },
-  { name:"Website",   orders:18, revenue:44100, color:"#6366F1", icon:"🌐" },
-  { name:"WhatsApp",  orders:12, revenue:29300, color:"#25D366", icon:"💬" },
-  { name:"Phone",     orders:4,  revenue:9800,  color:"#64748B", icon:"📞" },
-];
-
-const AGENTS: AgentData[] = [
-  { name:"Rafi",  orders:28, revenue:68400, delivered:19, pending:9  },
-  { name:"Mitu",  orders:34, revenue:82700, delivered:24, pending:10 },
-  { name:"Admin", orders:12, revenue:29800, delivered:9,  pending:3  },
-];
-
-const PIPELINE: PipelineStage[] = [
-  { stage:"Advance Paid",     count:8,  color:"#6366F1" },
-  { stage:"Ordered Supplier", count:12, color:"#D97706" },
-  { stage:"In Transit",       count:6,  color:"#0D9488" },
-  { stage:"Arrived BD",       count:3,  color:"#A855F7" },
-  { stage:"Packing",          count:2,  color:"#059669" },
-];
 
 const VIEW_ORDER_KEY = "shopadmin.viewOrder.num";
 
@@ -312,10 +249,145 @@ export default function Dashboard() {
   const [dateTo, setDateTo]     = useState("");
   const [quickRange, setQuickRange] = useState("7d");
   const [orders, setOrders] = useState(() => loadOrderCollection([]));
+  const [ordersHydrated, setOrdersHydrated] = useState(false);
+
+  const calcOrderAmount = (order: any) => {
+    const items = Array.isArray(order?.items) ? order.items : [];
+    return items.reduce((sum: number, item: any) => sum + Number(item?.price || 0) * Number(item?.qty || 0), 0);
+  };
+
+  const srcMeta = (source: string) => {
+    const key = String(source || "").toLowerCase();
+    if (key === "facebook") return { icon: "📘", color: "#1877F2", name: "Facebook" };
+    if (key === "instagram") return { icon: "📸", color: "#E1306C", name: "Instagram" };
+    if (key === "website") return { icon: "🌐", color: "#6366F1", name: "Website" };
+    if (key === "whatsapp") return { icon: "💬", color: "#25D366", name: "WhatsApp" };
+    if (key === "phone") return { icon: "📞", color: "#64748B", name: "Phone" };
+    return { icon: "📦", color: "#64748B", name: "Other" };
+  };
+
+  const iconForProduct = (name: string) => {
+    const n = String(name || "").toLowerCase();
+    if (n.includes("shoe") || n.includes("heel") || n.includes("sneaker") || n.includes("converse")) return { img: "👟", bg: "#1E40AF", cat: "Shoes" };
+    if (n.includes("bag") || n.includes("tote") || n.includes("clutch") || n.includes("backpack")) return { img: "👜", bg: "#92400E", cat: "Bags" };
+    if (n.includes("bracelet") || n.includes("chain") || n.includes("necklace")) return { img: "📿", bg: "#6B21A8", cat: "Accessories" };
+    return { img: "🛍️", bg: "#334155", cat: "General" };
+  };
+
+  const today = new Date();
+  const fmtDay = (d: Date) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+
+  const revenueMap = new Map<string, RevenuePoint>();
+  for (let i = 6; i >= 0; i -= 1) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = dayKey(d);
+    revenueMap.set(key, { day: fmtDay(d), revenue: 0, orders: 0, profit: 0 });
+  }
+
+  orders.forEach((order: any) => {
+    const d = new Date(String(order?.date || order?.updatedAt || ""));
+    if (Number.isNaN(d.getTime())) return;
+    const key = dayKey(d);
+    const point = revenueMap.get(key);
+    if (!point) return;
+    const amount = calcOrderAmount(order);
+    point.revenue += amount;
+    point.orders += 1;
+    point.profit += Math.round(amount * 0.3);
+  });
+
+  const REVENUE_BARS: RevenuePoint[] = Array.from(revenueMap.values());
+
+  const sourceMap = new Map<string, SourceData>();
+  orders.forEach((order: any) => {
+    const amount = calcOrderAmount(order);
+    const meta = srcMeta(String(order?.source || ""));
+    const cur = sourceMap.get(meta.name) || { ...meta, orders: 0, revenue: 0 };
+    cur.orders += 1;
+    cur.revenue += amount;
+    sourceMap.set(meta.name, cur);
+  });
+  const SOURCE_DATA: SourceData[] = Array.from(sourceMap.values());
+
+  const itemMap = new Map<string, { name: string; orders: number; revenue: number; topVar: Record<string, number> }>();
+  orders.forEach((order: any) => {
+    const items = Array.isArray(order?.items) ? order.items : [];
+    items.forEach((item: any) => {
+      const name = String(item?.name || "Unnamed Product");
+      const amount = Number(item?.price || 0) * Number(item?.qty || 0);
+      const key = `${String(item?.size || "")}-${String(item?.color || "")}`;
+      const cur = itemMap.get(name) || { name, orders: 0, revenue: 0, topVar: {} };
+      cur.orders += Number(item?.qty || 0);
+      cur.revenue += amount;
+      cur.topVar[key] = (cur.topVar[key] || 0) + Number(item?.qty || 0);
+      itemMap.set(name, cur);
+    });
+  });
+
+  const MOST_ORDERED: MostOrdered[] = Array.from(itemMap.values())
+    .sort((a, b) => b.orders - a.orders)
+    .slice(0, 8)
+    .map((row, index) => {
+      const topVar = Object.entries(row.topVar).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+      const meta = iconForProduct(row.name);
+      return {
+        rank: index + 1,
+        name: row.name,
+        cat: meta.cat,
+        img: meta.img,
+        bg: meta.bg,
+        orders: row.orders,
+        revenue: row.revenue,
+        topVar,
+      };
+    });
+
+  const agentMap = new Map<string, AgentData>();
+  orders.forEach((order: any) => {
+    const agent = String(order?.agent || "Unassigned");
+    const amount = calcOrderAmount(order);
+    const cur = agentMap.get(agent) || { name: agent, orders: 0, revenue: 0, delivered: 0, pending: 0 };
+    cur.orders += 1;
+    cur.revenue += amount;
+    if (String(order?.status || "").toLowerCase() === "delivered") cur.delivered += 1;
+    else cur.pending += 1;
+    agentMap.set(agent, cur);
+  });
+  const AGENTS: AgentData[] = Array.from(agentMap.values()).slice(0, 5);
+
+  const PIPELINE: PipelineStage[] = [
+    { stage: "Advance Paid", count: 0, color: "#6366F1" },
+    { stage: "Ordered Supplier", count: 0, color: "#D97706" },
+    { stage: "In Transit", count: 0, color: "#0D9488" },
+    { stage: "Arrived BD", count: 0, color: "#A855F7" },
+    { stage: "Packing", count: 0, color: "#059669" },
+  ];
+  orders.forEach((order: any) => {
+    const status = String(order?.status || "");
+    const row = PIPELINE.find((p) => p.stage.toLowerCase() === status.toLowerCase());
+    if (row) row.count += 1;
+  });
 
   useEffect(() => {
-    saveOrderCollection(orders);
-  }, [orders]);
+    let cancelled = false;
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer([]);
+      if (cancelled) return;
+      setOrders(synced as any);
+      setOrdersHydrated(true);
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ordersHydrated) return;
+    persistOrderCollectionToServer(orders as any);
+  }, [orders, ordersHydrated]);
 
   const applyRange = (range: string) => {
     setQuickRange(range);
@@ -333,7 +405,7 @@ export default function Dashboard() {
   const totalProfit  = REVENUE_BARS.reduce((a,b) => a+b.profit, 0);
   const totalSrcOrd  = SOURCE_DATA.reduce((a,b) => a+b.orders, 0);
   const pipTotal     = PIPELINE.reduce((a,b) => a+b.count, 0);
-  const maxOrders    = MOST_ORDERED[0].orders;
+  const maxOrders    = MOST_ORDERED[0]?.orders || 1;
 
   const fmtAgo = (at?: string, fallback?: string) => {
     const raw = at || fallback;
@@ -437,13 +509,17 @@ export default function Dashboard() {
   const openIssuesData = openIssueRows;
   const recentOrdersData = recentOrdersRows;
 
+  const todayRevenue = REVENUE_BARS[REVENUE_BARS.length - 1]?.revenue || 0;
+  const todayOrders = REVENUE_BARS[REVENUE_BARS.length - 1]?.orders || 0;
+  const totalCodDue = orders.reduce((sum: number, order: any) => sum + Math.max(0, calcOrderAmount(order) - Number(order?.advance || 0)), 0);
+
   const STATS: StatItem[] = [
-    { label:"Today's Revenue",   value:"৳18,500",                                        sub:"7 orders today",              color:"#6366F1", icon:"💰" },
-    { label:"Total COD Due",     value:"৳1,42,600",                                       sub:"Across unremitted orders",    color:"#D97706", icon:"💵" },
-    { label:"Week Revenue",      value:"৳"+totalRevenue.toLocaleString(),                sub:`৳${totalProfit.toLocaleString()} profit`, color:"#059669", icon:"📈" },
-    { label:"Total Orders",      value:"74",                                               sub:"All time",                    color:T.accent,  icon:"🛍️" },
-    { label:"Pending Verify",    value:String(pendingVerifyData.length),                 sub:"Manual bKash TxID",            color:"#DC2626", icon:"⚠️" },
-    { label:"Open Issues",       value:String(openIssuesData.length),                    sub:"Need resolution",              color:"#EF4444", icon:"🚨" },
+    { label:"Today's Revenue",   value:"৳"+todayRevenue.toLocaleString(),                  sub:`${todayOrders} orders today`,   color:"#6366F1", icon:"💰" },
+    { label:"Total COD Due",     value:"৳"+totalCodDue.toLocaleString(),                   sub:"Across current orders",        color:"#D97706", icon:"💵" },
+    { label:"Week Revenue",      value:"৳"+totalRevenue.toLocaleString(),                  sub:`৳${totalProfit.toLocaleString()} profit`, color:"#059669", icon:"📈" },
+    { label:"Total Orders",      value:String(orders.length),                               sub:"All time",                    color:T.accent,  icon:"🛍️" },
+    { label:"Pending Verify",    value:String(pendingVerifyData.length),                    sub:"Manual bKash TxID",           color:"#DC2626", icon:"⚠️" },
+    { label:"Open Issues",       value:String(openIssuesData.length),                       sub:"Need resolution",             color:"#EF4444", icon:"🚨" },
   ];
 
   const IS = { background:T.input, border:`1px solid ${T.border}`, borderRadius:"7px", color:T.text, padding:"6px 10px", fontSize:"12px", outline:"none", fontFamily:"inherit" };
@@ -467,7 +543,7 @@ export default function Dashboard() {
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div>
               <div style={{ fontSize:"15px", fontWeight:800, color:T.text }}>Dashboard</div>
-              <div style={{ fontSize:"11px", color:T.textMuted }}>Friday, 17 Apr 2026</div>
+              <div style={{ fontSize:"11px", color:T.textMuted }}>{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })}</div>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
               {!isAgent && (

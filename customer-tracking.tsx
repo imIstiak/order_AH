@@ -1,63 +1,17 @@
 import { useEffect, useState } from "react";
 import { mapAdminOrderToTracking } from "./core/tracking-adapter";
 import type { TrackingPayload } from "./core/tracking-adapter";
-import { loadOrderCollection } from "./core/order-store";
+import { loadOrderCollection, ORDERS_UPDATED_EVENT, syncOrderCollectionFromServer } from "./core/order-store";
 
-// ── MOCK ORDER DATA ───────────────────────────────────────────────────────
-const ADMIN_ORDERS = {
-  "#1001": {
-    num:"#1001", type:"stock", status:"Shipped",
-    customer:"Fatima Akter", phone:"01712345678", area:"Dhaka / Dhanmondi",
-    date:"2025-04-17T10:30:00+06:00",
-    items:[{ name:"Leather Tote Bag", size:"M", color:"Black", qty:1, price:2500 }],
-    advance:0, discount:0, discType:"flat",
-    pay:"COD", payStatus:"pending",
-    customerNote:"",
-    consId:"PT-2025-8821",
-    issue:null,
-  },
-  "#1002": {
-    num:"#1002", type:"preorder", status:"Ordered Supplier",
-    customer:"Rahela Khanam", phone:"01812345678", area:"Dhaka / Uttara",
-    date:"2025-04-14T14:15:00+06:00",
-    items:[{ name:"High Ankle Converse", size:"38", color:"White", qty:1, price:3200 }],
-    advance:800, discount:0, discType:"flat",
-    pay:"bKash", payStatus:"verified",
-    customerNote:"Ordered from supplier. Expected to arrive in Bangladesh by May 14. We will notify you at every step.",
-    consId:null,
-    issue:null,
-  },
-  "#1004": {
-    num:"#1004", type:"preorder", status:"Delayed",
-    customer:"Sabrina Islam", phone:"01612345678", area:"Sylhet / Zindabazar",
-    date:"2025-04-10T16:00:00+06:00",
-    items:[{ name:"Silver Bracelet", size:"Free", color:"Silver", qty:1, price:1800 }],
-    advance:500, discount:0, discType:"flat",
-    pay:"Manual bKash", payStatus:"verified",
-    customerNote:"We sincerely apologise for the delay. Your item has been slightly delayed in shipping. New estimated arrival: May 20. Thank you for your patience.",
-    consId:null,
-    issue:"Shipment delayed by supplier",
-  },
-  "#1005": {
-    num:"#1005", type:"stock", status:"Delivered",
-    customer:"Mithila Rahman", phone:"01512345678", area:"Dhaka / Mirpur",
-    date:"2025-04-09T11:00:00+06:00",
-    items:[{ name:"Quilted Shoulder Bag", size:"S", color:"Beige", qty:1, price:3500 }],
-    advance:0, discount:200, discType:"flat",
-    pay:"COD", payStatus:"collected",
-    customerNote:"",
-    consId:"PT-2025-7741",
-    issue:null,
-  },
-};
+const DEFAULT_ORDER_LIST: any[] = [];
 
-const persistedOrders = loadOrderCollection(Object.values(ADMIN_ORDERS));
-
-const ORDERS = Object.fromEntries(
-  persistedOrders.map((order) => {
-    const trackingOrder = mapAdminOrderToTracking(order);
-    return [trackingOrder.num, trackingOrder];
-  })
+const buildOrdersMap = (orders: any[]): Record<string, TrackingPayload> => (
+  Object.fromEntries(
+    (Array.isArray(orders) ? orders : []).map((order) => {
+      const trackingOrder = mapAdminOrderToTracking(order);
+      return [trackingOrder.num, trackingOrder];
+    })
+  ) as Record<string, TrackingPayload>
 );
 
 const isDhaka = (a) => a.toLowerCase().includes("dhaka");
@@ -298,18 +252,46 @@ export default function TrackingPage() {
   const [order, setOrder] = useState<TrackingPayload | null>(null);
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
+  const [ordersMap, setOrdersMap] = useState<Record<string, TrackingPayload>>(() =>
+    buildOrdersMap(loadOrderCollection(DEFAULT_ORDER_LIST as any[]))
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshFromLocal = () => {
+      if (cancelled) return;
+      const localOrders = loadOrderCollection(DEFAULT_ORDER_LIST as any[]);
+      setOrdersMap(buildOrdersMap(localOrders as any[]));
+    };
+
+    refreshFromLocal();
+
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer(DEFAULT_ORDER_LIST as any[]);
+      if (cancelled) return;
+      setOrdersMap(buildOrdersMap(synced as any[]));
+    };
+    void hydrate();
+
+    window.addEventListener(ORDERS_UPDATED_EVENT, refreshFromLocal as EventListener);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(ORDERS_UPDATED_EVENT, refreshFromLocal as EventListener);
+    };
+  }, []);
 
   const findOrder = (rawQuery: string): TrackingPayload | null => {
     const trimmed = rawQuery.trim();
     if (!trimmed) return null;
 
     const orderKey = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
-    if (ORDERS[orderKey]) return ORDERS[orderKey];
+    if (ordersMap[orderKey]) return ordersMap[orderKey];
 
     const qDigits = trimmed.replace(/\D/g, "");
     if (!qDigits) return null;
 
-    return Object.values(ORDERS).find((candidate: any) => String(candidate.phone || "").replace(/\D/g, "").includes(qDigits)) || null;
+    return Object.values(ordersMap).find((candidate: any) => String(candidate.phone || "").replace(/\D/g, "").includes(qDigits)) || null;
   };
 
   const handleSearch = () => {
@@ -346,7 +328,7 @@ export default function TrackingPage() {
       setOrder(null);
       setError("No order found for " + normalized + ". Please check and try again.");
     }
-  }, []);
+  }, [ordersMap]);
 
   return (
     <div style={{ minHeight:"100vh", fontFamily:"'Segoe UI',system-ui,sans-serif", background:"linear-gradient(160deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%)" }}>

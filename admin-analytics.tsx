@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
+import { loadOrderCollection, syncOrderCollectionFromServer } from "./core/order-store";
 import AdminSidebar from "./core/admin-sidebar";
 
 type ChartMetric = "revenue" | "profit" | "orders" | "cod";
@@ -17,61 +18,7 @@ type TrendPoint = {
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)" };
 
-const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
-
-const MONTHLY: TrendPoint[] = [
-  { month:"Nov", revenue:38400, profit:16200, orders:16, returns:1, cod:34200 },
-  { month:"Dec", revenue:52100, profit:22400, orders:22, returns:2, cod:46800 },
-  { month:"Jan", revenue:44800, profit:19100, orders:19, returns:1, cod:40200 },
-  { month:"Feb", revenue:61200, profit:26800, orders:26, returns:3, cod:55100 },
-  { month:"Mar", revenue:58700, profit:25200, orders:24, returns:2, cod:52900 },
-  { month:"Apr", revenue:78500, profit:34600, orders:32, returns:2, cod:70600 },
-];
-
-const WEEKLY: TrendPoint[] = [
-  { month:"Apr W1", revenue:16200, profit:7100, orders:7,  returns:0, cod:14600 },
-  { month:"Apr W2", revenue:19400, profit:8500, orders:8,  returns:1, cod:17400 },
-  { month:"Apr W3", revenue:22100, profit:9700, orders:9,  returns:1, cod:19800 },
-  { month:"Apr W4", revenue:20800, profit:9300, orders:8,  returns:0, cod:18800 },
-];
-
-const TOP_PRODUCTS = [
-  { rank:1, name:"Leather Tote Bag",     cat:"Bags",        img:"🛍️", bg:"#92400E", orders:24, revenue:60000, profit:33600, returnCount:0, topVar:"M-Black" },
-  { rank:2, name:"High Ankle Converse",  cat:"Shoes",       img:"👟", bg:"#1E40AF", orders:19, revenue:60800, profit:34200, returnCount:1, topVar:"38-White" },
-  { rank:3, name:"Quilted Shoulder Bag", cat:"Bags",        img:"👜", bg:"#9D174D", orders:16, revenue:56000, profit:32000, returnCount:0, topVar:"M-Pink" },
-  { rank:4, name:"Platform Sneakers",    cat:"Shoes",       img:"👠", bg:"#7C3AED", orders:14, revenue:53200, profit:28000, returnCount:2, topVar:"37-Black" },
-  { rank:5, name:"Canvas Backpack",      cat:"Bags",        img:"🎒", bg:"#065F46", orders:12, revenue:28800, profit:18000, returnCount:0, topVar:"L-Olive" },
-  { rank:6, name:"Silver Bracelet",      cat:"Accessories", img:"📿", bg:"#6B21A8", orders:11, revenue:19800, profit:13200, returnCount:0, topVar:"Free-Silver" },
-  { rank:7, name:"Ankle Strap Heels",    cat:"Shoes",       img:"🥿", bg:"#B45309", orders:9,  revenue:25200, profit:14400, returnCount:1, topVar:"37-Black" },
-  { rank:8, name:"Embroidered Clutch",   cat:"Bags",        img:"👝", bg:"#B91C1C", orders:7,  revenue:15400, profit:9800,  returnCount:0, topVar:"Free-Red" },
-];
-
-const CATEGORY_DATA = [
-  { name:"Bags",        orders:59, revenue:160000, profit:93600, color:"#6366F1" },
-  { name:"Shoes",       orders:42, revenue:139200, profit:76400, color:"#D97706" },
-  { name:"Accessories", orders:22, revenue:39600,  profit:26400, color:"#059669" },
-  { name:"Clothing",    orders:8,  revenue:16800,  profit:9600,  color:"#A855F7" },
-];
-
-const SOURCE_DATA = [
-  { name:"Facebook",  orders:32, revenue:78600,  color:"#1877F2", icon:"📘" },
-  { name:"Instagram", orders:28, revenue:68200,  color:"#E1306C", icon:"📸" },
-  { name:"Website",   orders:18, revenue:44100,  color:"#6366F1", icon:"🌐" },
-  { name:"WhatsApp",  orders:12, revenue:29300,  color:"#25D366", icon:"💬" },
-  { name:"Phone",     orders:4,  revenue:9800,   color:"#64748B", icon:"📞" },
-  { name:"Walk-in",   orders:2,  revenue:4100,   color:"#D97706", icon:"🏪" },
-];
-
-const AGENT_DATA = [
-  { name:"Istiak (Admin)", avatar:"IS", color:"#6366F1", orders:30, revenue:74200, delivered:24, cancelled:1, returns:1, avgTime:"0.9d" },
-  { name:"Mitu",           avatar:"MA", color:"#D97706", orders:34, revenue:82700, delivered:28, cancelled:2, returns:2, avgTime:"1.0d" },
-  { name:"Rafi",           avatar:"RA", color:"#059669", orders:28, revenue:68400, delivered:22, cancelled:1, returns:1, avgTime:"1.2d" },
-];
-
-const DELIVERY_ZONES = [
-  { name:"Inside Dhaka",  orders:62, revenue:148400, pct:66, color:"#6366F1" },
-  { name:"Outside Dhaka", orders:32, revenue:85600,  pct:34, color:"#D97706" },
-];
+const NAV: [string, string][] = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const fmt = (n: number) => n >= 100000 ? "৳"+(n/100000).toFixed(1)+"L" : n >= 1000 ? "৳"+(n/1000).toFixed(0)+"k" : "৳"+n;
 
@@ -156,11 +103,188 @@ export default function AnalyticsPage() {
   const [quickRange, setQuickRange]   = useState("6m");
   const [dateFrom,   setDateFrom]     = useState("");
   const [dateTo,     setDateTo]       = useState("");
+  const [orders, setOrders] = useState<any[]>(() => loadOrderCollection([]) as any[]);
   const sessionUser = loadSession()?.user;
   const userName = sessionUser?.name || "Admin";
   const userRole = sessionUser?.role === "agent" ? "Agent" : "Super Admin";
   const userAvatar = sessionUser?.avatar || "A";
   const userColor = sessionUser?.color || "linear-gradient(135deg,#6366F1,#A855F7)";
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer([]);
+      if (cancelled) return;
+      setOrders(synced as any[]);
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const calcAmount = (order: any) => {
+    const items = Array.isArray(order?.items) ? order.items : [];
+    return items.reduce((sum: number, item: any) => sum + Number(item?.price || 0) * Number(item?.qty || 0), 0);
+  };
+  const isReturnLike = (status: string) => {
+    const s = String(status || "").toLowerCase();
+    return s.includes("return") || s.includes("cancel");
+  };
+
+  const monthBuckets = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return {
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      month: d.toLocaleDateString("en-US", { month: "short" }),
+      revenue: 0,
+      profit: 0,
+      orders: 0,
+      returns: 0,
+      cod: 0,
+    };
+  });
+  const monthMap = new Map(monthBuckets.map((m) => [m.key, m]));
+
+  const weekBuckets = Array.from({ length: 4 }, (_, i) => ({
+    month: `W${i + 1}`,
+    revenue: 0,
+    profit: 0,
+    orders: 0,
+    returns: 0,
+    cod: 0,
+  }));
+
+  const productMap = new Map<string, { name: string; cat: string; orders: number; revenue: number; profit: number; returnCount: number; topVar: Record<string, number> }>();
+  const sourceMap = new Map<string, { name: string; orders: number; revenue: number; color: string; icon: string }>();
+  const categoryMap = new Map<string, { name: string; orders: number; revenue: number; profit: number; color: string }>();
+  const agentMap = new Map<string, { name: string; avatar: string; color: string; orders: number; revenue: number; delivered: number; cancelled: number; returns: number; avgTime: string }>();
+
+  let insideOrders = 0;
+  let outsideOrders = 0;
+  let insideRevenue = 0;
+  let outsideRevenue = 0;
+
+  orders.forEach((order: any) => {
+    const amount = calcAmount(order);
+    const date = new Date(String(order?.date || order?.updatedAt || ""));
+    const status = String(order?.status || "");
+    const isReturn = isReturnLike(status);
+    const isCod = String(order?.pay || "").toLowerCase().includes("cod");
+
+    if (!Number.isNaN(date.getTime())) {
+      const mKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      const mb = monthMap.get(mKey);
+      if (mb) {
+        mb.revenue += amount;
+        mb.profit += Math.round(amount * 0.3);
+        mb.orders += 1;
+        mb.returns += isReturn ? 1 : 0;
+        mb.cod += isCod ? amount : 0;
+      }
+
+      const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+      if (diffDays >= 0 && diffDays < 28) {
+        const idx = 3 - Math.floor(diffDays / 7);
+        if (weekBuckets[idx]) {
+          weekBuckets[idx].revenue += amount;
+          weekBuckets[idx].profit += Math.round(amount * 0.3);
+          weekBuckets[idx].orders += 1;
+          weekBuckets[idx].returns += isReturn ? 1 : 0;
+          weekBuckets[idx].cod += isCod ? amount : 0;
+        }
+      }
+    }
+
+    const sourceRaw = String(order?.source || "").toLowerCase();
+    const sourceMeta =
+      sourceRaw === "facebook" ? { name: "Facebook", icon: "📘", color: "#1877F2" } :
+      sourceRaw === "instagram" ? { name: "Instagram", icon: "📸", color: "#E1306C" } :
+      sourceRaw === "website" ? { name: "Website", icon: "🌐", color: "#6366F1" } :
+      sourceRaw === "whatsapp" ? { name: "WhatsApp", icon: "💬", color: "#25D366" } :
+      sourceRaw === "phone" ? { name: "Phone", icon: "📞", color: "#64748B" } :
+      { name: "Other", icon: "📦", color: "#D97706" };
+    const src = sourceMap.get(sourceMeta.name) || { ...sourceMeta, orders: 0, revenue: 0 };
+    src.orders += 1;
+    src.revenue += amount;
+    sourceMap.set(sourceMeta.name, src);
+
+    const agentName = String(order?.agent || "Unassigned");
+    const initials = agentName.split(" ").filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase() || "").join("") || "UA";
+    const agent = agentMap.get(agentName) || { name: agentName, avatar: initials, color: "#6366F1", orders: 0, revenue: 0, delivered: 0, cancelled: 0, returns: 0, avgTime: "-" };
+    agent.orders += 1;
+    agent.revenue += amount;
+    if (String(status).toLowerCase() === "delivered") agent.delivered += 1;
+    if (String(status).toLowerCase().includes("cancel")) agent.cancelled += 1;
+    if (isReturn) agent.returns += 1;
+    agentMap.set(agentName, agent);
+
+    const area = String(order?.area || order?.deliveryArea || order?.district || "").toLowerCase();
+    const isInside = area.includes("dhaka") || area.includes("inside");
+    if (isInside) {
+      insideOrders += 1;
+      insideRevenue += amount;
+    } else {
+      outsideOrders += 1;
+      outsideRevenue += amount;
+    }
+
+    const items = Array.isArray(order?.items) ? order.items : [];
+    items.forEach((item: any) => {
+      const name = String(item?.name || "Unnamed Product");
+      const qty = Number(item?.qty || 0);
+      const lineRevenue = Number(item?.price || 0) * qty;
+      const lc = name.toLowerCase();
+      const cat = lc.includes("bag") || lc.includes("tote") || lc.includes("clutch") ? "Bags" : lc.includes("shoe") || lc.includes("sneaker") || lc.includes("heel") || lc.includes("converse") ? "Shoes" : "General";
+      const varKey = `${String(item?.size || "")} ${String(item?.color || "")}`.trim() || "-";
+
+      const p = productMap.get(name) || { name, cat, orders: 0, revenue: 0, profit: 0, returnCount: 0, topVar: {} };
+      p.orders += qty;
+      p.revenue += lineRevenue;
+      p.profit += Math.round(lineRevenue * 0.3);
+      p.returnCount += isReturn ? 1 : 0;
+      p.topVar[varKey] = (p.topVar[varKey] || 0) + qty;
+      productMap.set(name, p);
+
+      const color = cat === "Bags" ? "#6366F1" : cat === "Shoes" ? "#D97706" : "#0D9488";
+      const c = categoryMap.get(cat) || { name: cat, orders: 0, revenue: 0, profit: 0, color };
+      c.orders += qty;
+      c.revenue += lineRevenue;
+      c.profit += Math.round(lineRevenue * 0.3);
+      categoryMap.set(cat, c);
+    });
+  });
+
+  const MONTHLY: TrendPoint[] = monthBuckets.map((m) => ({ month: m.month, revenue: m.revenue, profit: m.profit, orders: m.orders, returns: m.returns, cod: m.cod }));
+  const WEEKLY: TrendPoint[] = weekBuckets;
+  const CATEGORY_DATA = Array.from(categoryMap.values());
+  const SOURCE_DATA = Array.from(sourceMap.values());
+  const AGENT_DATA = Array.from(agentMap.values());
+  const DELIVERY_ZONES = [
+    { name: "Inside Dhaka", orders: insideOrders, revenue: insideRevenue, pct: 0, color: "#6366F1" },
+    { name: "Outside Dhaka", orders: outsideOrders, revenue: outsideRevenue, pct: 0, color: "#D97706" },
+  ];
+  const zoneTotal = DELIVERY_ZONES.reduce((sum, z) => sum + z.orders, 0) || 1;
+  DELIVERY_ZONES.forEach((z) => {
+    z.pct = Math.round((z.orders / zoneTotal) * 100);
+  });
+
+  const TOP_PRODUCTS = Array.from(productMap.values())
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8)
+    .map((p, i) => ({
+      rank: i + 1,
+      name: p.name,
+      cat: p.cat,
+      img: p.cat === "Shoes" ? "👟" : p.cat === "Bags" ? "👜" : "🛍️",
+      bg: p.cat === "Shoes" ? "#1E40AF" : p.cat === "Bags" ? "#92400E" : "#334155",
+      orders: p.orders,
+      revenue: p.revenue,
+      profit: p.profit,
+      returnCount: p.returnCount,
+      topVar: Object.entries(p.topVar).sort((a, b) => b[1] - a[1])[0]?.[0] || "-",
+    }));
 
   const handleSignOut = () => {
     clearSession();
@@ -193,7 +317,7 @@ export default function AnalyticsPage() {
   const returnRate    = returnRateNum.toFixed(1);
   const totalSrcOrd   = SOURCE_DATA.reduce((a,b)=>a+b.orders,0);
   const totalCatOrd   = CATEGORY_DATA.reduce((a,b)=>a+b.orders,0);
-  const maxProdOrders = TOP_PRODUCTS[0].orders;
+  const maxProdOrders = TOP_PRODUCTS[0]?.orders || 1;
 
   const STATS = [
     { label:"Total Revenue",   value:fmt(totalRevenue),  sub:"this period",   delta:14,  color:"#6366F1", icon:"💰" },
@@ -325,7 +449,7 @@ export default function AnalyticsPage() {
 
             <CardWrap title="Revenue by Category" T={T}>
               {CATEGORY_DATA.map((c,i)=>{
-                const pct = Math.round(c.orders/totalCatOrd*100);
+                const pct = totalCatOrd > 0 ? Math.round(c.orders/totalCatOrd*100) : 0;
                 return (
                   <div key={i} style={{ marginBottom:"12px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
@@ -346,7 +470,7 @@ export default function AnalyticsPage() {
 
             <CardWrap title="Orders by Source" T={T}>
               {SOURCE_DATA.map((s,i)=>{
-                const pct = Math.round(s.orders/totalSrcOrd*100);
+                const pct = totalSrcOrd > 0 ? Math.round(s.orders/totalSrcOrd*100) : 0;
                 return (
                   <div key={i} style={{ marginBottom:"11px" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
@@ -384,12 +508,12 @@ export default function AnalyticsPage() {
               <div style={{ marginTop:"6px", padding:"10px 12px", background:T.tHead, borderRadius:"8px" }}>
                 <div style={{ fontSize:"11px", color:T.textMuted, marginBottom:"4px" }}>Delivery charge collected</div>
                 <div style={{ display:"flex", justifyContent:"space-between" }}>
-                  <span style={{ fontSize:"12px", color:T.textMuted }}>Inside (৳80 × {DELIVERY_ZONES[0].orders})</span>
-                  <span style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{(80*DELIVERY_ZONES[0].orders).toLocaleString()}</span>
+                  <span style={{ fontSize:"12px", color:T.textMuted }}>Inside (৳80 × {DELIVERY_ZONES[0]?.orders || 0})</span>
+                  <span style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{(80*(DELIVERY_ZONES[0]?.orders || 0)).toLocaleString()}</span>
                 </div>
                 <div style={{ display:"flex", justifyContent:"space-between", marginTop:"3px" }}>
-                  <span style={{ fontSize:"12px", color:T.textMuted }}>Outside (৳150 × {DELIVERY_ZONES[1].orders})</span>
-                  <span style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{(150*DELIVERY_ZONES[1].orders).toLocaleString()}</span>
+                  <span style={{ fontSize:"12px", color:T.textMuted }}>Outside (৳150 × {DELIVERY_ZONES[1]?.orders || 0})</span>
+                  <span style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{(150*(DELIVERY_ZONES[1]?.orders || 0)).toLocaleString()}</span>
                 </div>
               </div>
             </CardWrap>
@@ -431,7 +555,7 @@ export default function AnalyticsPage() {
             <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"12px" }}>
               {AGENT_DATA.map((a,i)=>{
                 const totalAgentOrders = AGENT_DATA.reduce((x,b)=>x+b.orders,0);
-                const pct = Math.round(a.orders/totalAgentOrders*100);
+                const pct = totalAgentOrders > 0 ? Math.round(a.orders/totalAgentOrders*100) : 0;
                 return (
                   <div key={i} style={{ background:T.bg, borderRadius:"10px", padding:"14px", border:`1px solid ${T.border}` }}>
                     <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"12px" }}>

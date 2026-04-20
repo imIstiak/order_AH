@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
@@ -204,9 +205,9 @@ function CouponModal({ coupon, onSave, onClose, T }) {
 
   const canSave = code.trim() && (type === "free_ship" || value > 0);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!canSave) return;
-    onSave({
+    await onSave({
       id: coupon.id || "c" + Date.now(),
       code: code.toUpperCase().trim(),
       type, value:parseFloat(value)||0,
@@ -362,7 +363,7 @@ function CouponModal({ coupon, onSave, onClose, T }) {
 export default function CouponsPage() {
   const [dark, setDark]         = useState(false);
   const T = dark ? DARK : LIGHT;
-  const [coupons, setCoupons]   = useState(INIT_COUPONS);
+  const [coupons, setCoupons]   = useState([]);
   const [viewMode, setViewMode] = useState("grid");
   const [search, setSearch]     = useState("");
   const [filter, setFilter]     = useState("all");
@@ -370,6 +371,39 @@ export default function CouponsPage() {
   const [showModal, setShowModal]   = useState(false);
   const [delId, setDelId]           = useState(null);
   const [feedback, setFeedback]     = useState("");
+  const [loadError, setLoadError]   = useState("");
+    useEffect(() => {
+      let cancelled = false;
+      const hydrate = async () => {
+        const data = await loadAppState<any[]>("coupons.list", []);
+        if (cancelled) return;
+        if (Array.isArray(data)) {
+          setCoupons(data as any);
+        } else {
+          setCoupons([]);
+        }
+      };
+      hydrate().catch((error: any) => {
+        if (cancelled) return;
+        setLoadError(String(error?.message || "Failed to load coupons."));
+        setCoupons([]);
+      });
+      return () => {
+        cancelled = true;
+      };
+    }, []);
+
+    const persistCoupons = async (next: any[], successMessage: string, rollback?: any[]) => {
+      try {
+        await saveAppState("coupons.list", next);
+        setFeedback(successMessage);
+      } catch (error: any) {
+        if (rollback) setCoupons(rollback as any);
+        setFeedback(String(error?.message || "Failed to save coupon changes."));
+        throw error;
+      }
+    };
+
   const sessionUser = loadSession()?.user;
   const userName = sessionUser?.name || "Admin";
   const userRole = sessionUser?.role === "agent" ? "Agent" : "Super Admin";
@@ -389,29 +423,36 @@ export default function CouponsPage() {
     return true;
   });
 
-  const handleSave = (updated) => {
+  const handleSave = async (updated) => {
+    const snapshot = [...coupons];
     if (coupons.find(c => c.id === updated.id)) {
-      setCoupons(p => p.map(c => c.id === updated.id ? updated : c));
-      setFeedback("Coupon updated successfully.");
+      const next = coupons.map(c => c.id === updated.id ? updated : c);
+      setCoupons(next as any);
+      await persistCoupons(next as any[], "Coupon updated successfully.", snapshot as any[]);
     } else {
-      setCoupons(p => [...p, updated]);
-      setFeedback("Coupon created successfully.");
+      const next = [...coupons, updated];
+      setCoupons(next as any);
+      await persistCoupons(next as any[], "Coupon created successfully.", snapshot as any[]);
     }
     setShowModal(false); setEditCoupon(null);
   };
 
-  const handleToggle = (id) => {
+  const handleToggle = async (id) => {
     const target = coupons.find(c => c.id === id);
     if (!target) return;
     const nextStatus = target.status === "active" ? "inactive" : "active";
     if (!window.confirm(`Change status for coupon ${target.code} to ${nextStatus}?`)) return;
-    setCoupons(p => p.map(c => c.id === id ? { ...c, status: nextStatus } : c));
-    setFeedback(`Coupon ${target.code} is now ${nextStatus}.`);
+    const snapshot = [...coupons];
+    const next = coupons.map(c => c.id === id ? { ...c, status: nextStatus } : c);
+    setCoupons(next as any);
+    await persistCoupons(next as any[], `Coupon ${target.code} is now ${nextStatus}.`, snapshot as any[]);
   };
 
-  const handleDelete = (id) => {
-    setCoupons(p => p.filter(c => c.id !== id));
-    setFeedback("Coupon deleted successfully.");
+  const handleDelete = async (id) => {
+    const snapshot = [...coupons];
+    const next = coupons.filter(c => c.id !== id);
+    setCoupons(next as any);
+    await persistCoupons(next as any[], "Coupon deleted successfully.", snapshot as any[]);
     setDelId(null);
   };
 
@@ -488,6 +529,12 @@ export default function CouponsPage() {
           {feedback && (
             <div style={{ marginBottom:"12px", padding:"10px 12px", borderRadius:"8px", background:"#05966915", border:"1px solid #05966930", color:"#059669", fontSize:"12px", fontWeight:700 }}>
               {feedback}
+            </div>
+          )}
+
+          {loadError && (
+            <div style={{ marginBottom:"12px", padding:"10px 12px", borderRadius:"8px", background:"#EF444415", border:"1px solid #EF444430", color:"#DC2626", fontSize:"12px", fontWeight:700 }}>
+              {loadError}
             </div>
           )}
 

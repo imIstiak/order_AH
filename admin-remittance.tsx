@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
@@ -47,23 +48,8 @@ const INIT_SETTLED = [
   },
 ];
 
-// Simulate what IDs the "uploaded invoice" contains (matches PENDING_ORDERS)
-const INVOICE_160426 = {
-  invoiceId:"160426LFFJSRZ",
-  invoiceDate:"2026-04-16",
-  totalPaidOut:32470.65,
-  fileName:"160426LFFJSRZ-2026-04-17.pdf",
-  consignmentIds:[
-    "DL140426NSE58N","DL120426L99NUJ","DL140426GV77CL","DL120426QZ2NK5",
-    "DL140426VLTPB6","DL140426E6JVGU","DL120426DXRMZZ","DL120426PDGJ67",
-    "DL140426FY9A69","DL140426VEJBRD","DL120426KLZ9J8","DL120426P6D8F8",
-    "DL140426AYE5E9","DL120426RSDYXL","DL120426ZWH8PE","DL120426JUPS9B",
-    "RL120426JUPS9B","DL090426STP2R4","DL140426RDQPXX","DL120426YZLPJG",
-    "DL120426C2QN8G","DL120426LQKPS7","DL090426GM3J2V","DL1404268V5HRZ",
-    "DL140426H63PXK","DL0904267E8ELQ","RL0904267E8ELQ","RL090426STP2R4",
-    "DL120426BJWEA7","RL120426BJWEA7","DL120426QGLL3Z","RL120426QGLL3Z",
-  ],
-};
+type PendingOrder = (typeof PENDING_ORDERS)[number];
+type SettledBatch = (typeof INIT_SETTLED)[number];
 
 // Calc per order
 const calcOrder = (o) => {
@@ -151,11 +137,17 @@ function SettleModal({ pending, onSettle, onClose, T }) {
   const handleFile = (file) => {
     if (!file) return;
     setParsing(true);
-    // Simulate PDF parsing delay
+    // Keep a short parsing delay for UX while deriving candidates from live pending rows.
     setTimeout(() => {
-      // In real system: parse PDF/CSV → extract consignment IDs
-      // Here we simulate using INVOICE_160426 mock data
-      const invoice = INVOICE_160426;
+      const calc = calcBatch(pending);
+      const invoiceId = (file.name || "").replace(/\.[^/.]+$/, "") || `INV-${Date.now()}`;
+      const invoice = {
+        invoiceId,
+        invoiceDate: new Date().toISOString().slice(0, 10),
+        totalPaidOut: calc.netPayable,
+        fileName: file.name,
+        consignmentIds: pending.map((order) => order.consId).filter(Boolean),
+      };
       const matchedOrders = [];
       const unmatchedIds  = [];
       invoice.consignmentIds.forEach(cid => {
@@ -416,8 +408,9 @@ export default function RemittancePage() {
   const [dark, setDark]           = useState(false);
   const T = dark ? DARK : LIGHT;
   const [tab, setTab]             = useState("pending");
-  const [pending, setPending]     = useState(PENDING_ORDERS);
-  const [settled, setSettled]     = useState(INIT_SETTLED);
+  const [pending, setPending]     = useState<PendingOrder[]>([]);
+  const [settled, setSettled]     = useState<SettledBatch[]>([]);
+  const [remittanceReady, setRemittanceReady] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [expandedBatch, setExpanded] = useState(null);
   const sessionUser = loadSession()?.user;
@@ -431,6 +424,37 @@ export default function RemittancePage() {
     window.location.hash = "#/admin/login";
     window.dispatchEvent(new Event("hashchange"));
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const loadedPending = await loadAppState<PendingOrder[]>("remittance.pending", []);
+      const loadedSettled = await loadAppState<SettledBatch[]>("remittance.settled", []);
+      if (!mounted) {
+        return;
+      }
+      setPending(Array.isArray(loadedPending) ? loadedPending : []);
+      setSettled(Array.isArray(loadedSettled) ? loadedSettled : []);
+      setRemittanceReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remittanceReady) {
+      return;
+    }
+    void saveAppState("remittance.pending", pending);
+  }, [pending, remittanceReady]);
+
+  useEffect(() => {
+    if (!remittanceReady) {
+      return;
+    }
+    void saveAppState("remittance.settled", settled);
+  }, [settled, remittanceReady]);
 
   const pendingDeliveries = pending.filter(o => o.type === "delivery");
   const pendingReturns    = pending.filter(o => o.type === "return");

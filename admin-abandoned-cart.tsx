@@ -1,7 +1,8 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 type Source = "facebook" | "instagram" | "whatsapp" | "website" | "phone";
 type ReminderType = "first" | "second";
@@ -422,7 +423,8 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
 export default function AbandonedCartPage() {
   const [dark, setDark]         = useState(false);
   const T = dark ? DARK : LIGHT;
-  const [carts, setCarts]       = useState<Cart[]>(INIT_CARTS);
+  const [carts, setCarts]       = useState<Cart[]>([]);
+  const [cartsReady, setCartsReady] = useState(false);
   const [selected, setSelected] = useState<Cart | null>(null);
   const [filter, setFilter]     = useState<FilterMode>("all");
   const [search, setSearch]     = useState("");
@@ -437,6 +439,28 @@ export default function AbandonedCartPage() {
     window.location.hash = "#/admin/login";
     window.dispatchEvent(new Event("hashchange"));
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const loaded = await loadAppState<Cart[]>("abandoned.carts", []);
+      if (!mounted) {
+        return;
+      }
+      setCarts(Array.isArray(loaded) ? loaded : []);
+      setCartsReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!cartsReady) {
+      return;
+    }
+    void saveAppState("abandoned.carts", carts);
+  }, [carts, cartsReady]);
 
   const filtered = carts.filter(c => {
     if (filter === "active"    && (c.converted || c.status==="expired")) return false;

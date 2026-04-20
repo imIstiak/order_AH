@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)" };
@@ -36,6 +37,8 @@ const INIT_ORDERS = [
 
 const PROD_EMOJI = { "High Ankle Converse":"👟","Silver Bracelet":"📿","Quilted Shoulder Bag":"👜","Platform Sneakers":"👠","Canvas Backpack":"🎒","Ankle Strap Heels":"🥿","Embroidered Clutch":"👝","Woven Raffia Bag":"🧺","Leather Tote Bag":"🛍️","Gold Chain Necklace":"💛" };
 const PROD_BG    = { "High Ankle Converse":"#1E40AF","Silver Bracelet":"#6B21A8","Quilted Shoulder Bag":"#9D174D","Platform Sneakers":"#7C3AED","Canvas Backpack":"#065F46","Ankle Strap Heels":"#B45309","Embroidered Clutch":"#B91C1C","Woven Raffia Bag":"#78350F","Leather Tote Bag":"#92400E","Gold Chain Necklace":"#92400E" };
+
+type PreOrderRecord = (typeof INIT_ORDERS)[number];
 
 // ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 
@@ -304,7 +307,8 @@ function DetailPanel({ order, onClose, onUpdate, onMove, stages, T }) {
 export default function PreOrdersPipeline() {
   const [dark, setDark]       = useState(false);
   const T = dark ? DARK : LIGHT;
-  const [orders, setOrders]   = useState(INIT_ORDERS);
+  const [orders, setOrders]   = useState<PreOrderRecord[]>([]);
+  const [ordersReady, setOrdersReady] = useState(false);
   const [selected, setSelected] = useState([]);   // selected order IDs for bulk
   const [detail, setDetail]   = useState(null);   // order open in detail panel
   const [search, setSearch]   = useState("");
@@ -321,6 +325,28 @@ export default function PreOrdersPipeline() {
     window.location.hash = "#/admin/login";
     window.dispatchEvent(new Event("hashchange"));
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const loaded = await loadAppState<PreOrderRecord[]>("preorders.pipeline", []);
+      if (!mounted) {
+        return;
+      }
+      setOrders(Array.isArray(loaded) ? loaded : []);
+      setOrdersReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ordersReady) {
+      return;
+    }
+    void saveAppState("preorders.pipeline", orders);
+  }, [orders, ordersReady]);
 
   const filtered = orders.filter(o =>
     !search || o.customer.toLowerCase().includes(search.toLowerCase()) ||

@@ -1,406 +1,289 @@
-import { useState, useRef, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useEffect, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
-import { clearSession } from "./core/auth-session";
+import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
-const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1" };
-const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1" };
+const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1" };
+const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1" };
 
-const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const NAV = [["?","Dashboard"],["=","Orders"],["??","Batches"],["?","Pre-Orders"],["?","Products"],["?","Customers"],["?","Abandoned"],["?","Coupons"],["$","Remittance"],["?","Analytics"],["?","Settings"]];
 
 const TABS = [
-  { id:"profile",  icon:"👤", label:"Profile Info"            },
-  { id:"password", icon:"🔑", label:"Change Password"         },
-  { id:"notifs",   icon:"🔔", label:"Notification Preferences" },
-];
+  { id:"profile",  icon:"??", label:"Profile Info" },
+  { id:"password", icon:"??", label:"Change Password" },
+  { id:"notifs",   icon:"??", label:"Notifications" },
+] as const;
 
-const LOGIN_HISTORY = [
-  { device:"Chrome on Windows", ip:"103.124.x.x", location:"Dhaka, BD", time:"Today, 10:30 AM",    current:true  },
-  { device:"Chrome on Android", ip:"103.124.x.x", location:"Dhaka, BD", time:"Yesterday, 8:15 PM", current:false },
-  { device:"Safari on iPhone",  ip:"202.51.x.x",  location:"Dhaka, BD", time:"16 Apr, 3:00 PM",    current:false },
-  { device:"Chrome on Windows", ip:"103.124.x.x", location:"Dhaka, BD", time:"15 Apr, 11:00 AM",   current:false },
-];
-
-// ── HELPERS ───────────────────────────────────────────────────────────────
-
-function SL({ c, T, req = false, sub = "" }: { c: ReactNode; T: any; req?: boolean; sub?: string }) {
+function Field({ label, value, onChange, T, type = "text" }: { label: string; value: string; onChange: (e: any) => void; T: any; type?: string }) {
   return (
-    <div style={{ marginBottom:"6px" }}>
-      <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{c}{req&&<span style={{ color:"#EF4444", marginLeft:"3px" }}>*</span>}</div>
-      {sub && <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"1px" }}>{sub}</div>}
+    <div style={{ marginBottom:"12px" }}>
+      <div style={{ fontSize:"12px", fontWeight:600, color:T.text, marginBottom:"6px" }}>{label}</div>
+      <input value={value} onChange={onChange} type={type}
+        style={{ background:T.input, border:`1px solid ${T.ib}`, borderRadius:"8px", color:T.text, padding:"10px 12px", fontSize:"13px", outline:"none", width:"100%", boxSizing:"border-box" }} />
     </div>
   );
 }
 
-function Inp({ value, onChange = () => {}, placeholder = "", T, type = "text", disabled = false }: { value: any; onChange?: (e: any) => void; placeholder?: string; T: any; type?: string; disabled?: boolean }) {
-  const [f,setF] = useState(false);
+function Toggle({ label, value, setValue, T }: { label: string; value: boolean; setValue: Dispatch<SetStateAction<boolean>>; T: any }) {
   return (
-    <input type={type} value={value} onChange={onChange} placeholder={placeholder} disabled={!!disabled}
-      onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-      style={{ background:T.input, border:`1.5px solid ${f&&!disabled?T.accent:T.ib}`, borderRadius:"9px", color:T.text, padding:"10px 13px", fontSize:"13px", outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit", opacity:disabled?0.5:1 }}/>
-  );
-}
-
-function Card({ title, sub = "", children, T }: { title?: string; sub?: string; children: ReactNode; T: any }) {
-  return (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", overflow:"hidden", marginBottom:"16px" }}>
-      {title && (
-        <div style={{ padding:"14px 20px", borderBottom:`1px solid ${T.border}` }}>
-          <div style={{ fontSize:"14px", fontWeight:700, color:T.text }}>{title}</div>
-          {sub && <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"2px" }}>{sub}</div>}
-        </div>
-      )}
-      <div style={{ padding:"20px" }}>{children}</div>
-    </div>
-  );
-}
-
-function Toggle({ val, set, label, sub = "", T }: { val: boolean; set: Dispatch<SetStateAction<boolean>>; label: string; sub?: string; T: any }) {
-  return (
-    <label style={{ display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:"11px 14px", background:val?T.accent+"08":T.bg, borderRadius:"9px", border:`1px solid ${val?T.accent+"25":T.border}`, marginBottom:"8px" }}>
-      <div>
-        <div style={{ fontSize:"13px", fontWeight:600, color:T.text }}>{label}</div>
-        {sub && <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"2px" }}>{sub}</div>}
-      </div>
-      <div onClick={() => set(p=>!p)}
-        style={{ width:"40px", height:"23px", borderRadius:"23px", background:val?T.accent:"#CBD5E1", position:"relative", transition:"background 0.2s", flexShrink:0, marginLeft:"12px" }}>
-        <div style={{ width:"19px", height:"19px", background:"#fff", borderRadius:"50%", position:"absolute", top:"2px", left:val?"19px":"2px", transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.3)" }}/>
+    <label style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 12px", border:`1px solid ${T.border}`, borderRadius:"8px", marginBottom:"8px", background:value?T.accent+"10":T.bg }}>
+      <span style={{ fontSize:"13px", color:T.text }}>{label}</span>
+      <div onClick={() => setValue((p) => !p)} style={{ width:"40px", height:"22px", borderRadius:"22px", background:value?T.accent:"#CBD5E1", position:"relative", cursor:"pointer" }}>
+        <div style={{ width:"18px", height:"18px", borderRadius:"50%", background:"#fff", position:"absolute", top:"2px", left:value?"20px":"2px", transition:"left 0.2s" }} />
       </div>
     </label>
   );
 }
 
-function SaveBtn({ onSave, T }: { onSave?: () => void; T: any }) {
+function SaveBtn({ onSave, T }: { onSave: () => Promise<void> | void; T: any }) {
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const handle = () => { onSave?.(); setSaved(true); setTimeout(()=>setSaved(false), 2200); };
-  return (
-    <button onClick={handle}
-      style={{ background:saved?"#059669":T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px 28px", fontSize:"13px", fontWeight:700, cursor:"pointer", transition:"background 0.2s" }}>
-      {saved ? "✓ Saved!" : "Save Changes"}
-    </button>
-  );
-}
+  const [error, setError] = useState("");
 
-// ── AVATAR SECTION ────────────────────────────────────────────────────────
-function AvatarSection({ name, role, avatarUrl, onUpload, T }: { name: string; role: string; avatarUrl: string; onUpload: (v: string) => void; T: any }) {
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const initials = name.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
-  const handleFile = (file: File | null) => {
-    if (!file) return;
-    const r = new FileReader();
-    r.onload = (e) => {
-      const result = e.target?.result;
-      if (typeof result === "string") onUpload(result);
-    };
-    r.readAsDataURL(file);
-  };
-  return (
-    <div style={{ display:"flex", alignItems:"center", gap:"20px" }}>
-      <div style={{ position:"relative", flexShrink:0 }}>
-        <div style={{ width:"80px", height:"80px", borderRadius:"50%", background:avatarUrl?"transparent":"linear-gradient(135deg,#6366F1,#A855F7)", display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden", boxShadow:"0 4px 16px rgba(99,102,241,0.25)" }}>
-          {avatarUrl
-            ? <img src={avatarUrl} alt="" style={{ width:"100%", height:"100%", objectFit:"cover" }}/>
-            : <span style={{ color:"#fff", fontSize:"26px", fontWeight:800 }}>{initials}</span>}
-        </div>
-        <div onClick={() => fileRef.current?.click()}
-          style={{ position:"absolute", bottom:"2px", right:"2px", width:"24px", height:"24px", borderRadius:"50%", background:T.accent, display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", border:`2px solid ${T.surface}` }}>
-          <span style={{ fontSize:"11px", color:"#fff" }}>✏</span>
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }}
-          onChange={(e) => {
-            const file = e.target.files?.[0] ?? null;
-            handleFile(file);
-            <AdminSidebar
-              T={T}
-              dark={dark}
-              setDark={setDark}
-              navItems={NAV}
-              user={{ name: "Istiak Shaharia", role: "Admin · Profile", avatar: "IS", color: "linear-gradient(135deg,#6366F1,#A855F7)" }}
-              onNavigateLabel={(_, i) => setNav(i)}
-              highlightProfile
-            />
-            <SL c="Phone Number" T={T} req/>
-            <Inp value={phone} onChange={e=>setPhone(e.target.value)} T={T}/>
-          </div>
-          <div>
-            <SL c="WhatsApp Number" T={T} sub="For order alerts on WhatsApp"/>
-            <Inp value={whatsapp} onChange={e=>setWhatsapp(e.target.value)} T={T}/>
-          </div>
-        </div>
-        <div style={{ marginBottom:"16px" }}>
-          <SL c="Bio (optional)" T={T}/>
-          <textarea value={bio} onChange={e=>setBio(e.target.value)} style={TA}/>
-        </div>
-        <div style={{ display:"flex", justifyContent:"flex-end" }}>
-          <SaveBtn T={T}/>
-        </div>
-      </Card>
-
-      <Card title="Recent Login Activity" sub="Your last 4 sign-ins" T={T}>
-        {LOGIN_HISTORY.map((l,i) => (
-          <div key={i} style={{ display:"flex", alignItems:"center", gap:"12px", padding:"11px 0", borderBottom:i<LOGIN_HISTORY.length-1?`1px solid ${T.border}`:"none" }}>
-            <div style={{ width:"38px", height:"38px", borderRadius:"9px", background:T.bg, border:`1px solid ${T.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px", flexShrink:0 }}>
-              {l.device.includes("Android")||l.device.includes("iPhone")?"📱":"💻"}
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"2px" }}>
-                <span style={{ fontSize:"13px", fontWeight:600, color:T.text }}>{l.device}</span>
-                {l.current && <span style={{ fontSize:"9px", fontWeight:700, background:"#10B98115", color:"#059669", padding:"1px 7px", borderRadius:"4px" }}>CURRENT</span>}
-              </div>
-              <div style={{ fontSize:"11px", color:T.textMuted }}>{l.location} · {l.ip} · {l.time}</div>
-            </div>
-            {!l.current && (
-              <button style={{ background:"#EF444412", border:"1px solid #EF444425", color:"#DC2626", borderRadius:"6px", padding:"5px 10px", fontSize:"11px", fontWeight:600, cursor:"pointer" }}>Revoke</button>
-            )}
-          </div>
-        ))}
-      </Card>
-    </>
-  );
-}
-
-// ── PASSWORD TAB ──────────────────────────────────────────────────────────
-function PasswordTab({ T }: { T: any }) {
-  const [current,   setCurrent]  = useState("");
-  const [newPass,   setNewPass]  = useState("");
-  const [confirm,   setConfirm]  = useState("");
-  const [showCur,   setShowCur]  = useState(false);
-  const [showNew,   setShowNew]  = useState(false);
-  const [showCon,   setShowCon]  = useState(false);
-  const [done,      setDone]     = useState(false);
-  const [error,     setError]    = useState("");
-
-  const strength      = !newPass?0:newPass.length<6?1:newPass.length<10?2:/[A-Z]/.test(newPass)&&/[0-9]/.test(newPass)?4:3;
-  const strLabel      = ["","Weak","Fair","Good","Strong"];
-  const strColor      = ["","#DC2626","#D97706","#6366F1","#059669"];
-  const strWidth      = ["0%","25%","50%","75%","100%"];
-
-  const handle = () => {
+  const handle = async () => {
+    if (saving) return;
     setError("");
-    if (!current)          { setError("Please enter your current password."); return; }
-    if (newPass.length < 8){ setError("New password must be at least 8 characters."); return; }
-    if (newPass !== confirm){ setError("New passwords do not match."); return; }
-    if (current !== "admin123"){ setError("Current password is incorrect."); return; }
-    setDone(true); setCurrent(""); setNewPass(""); setConfirm("");
-    setTimeout(() => setDone(false), 3000);
-  };
-
-  const PassInp = ({ value, onChange, placeholder, show, setShow }: { value: string; onChange: (e: any) => void; placeholder: string; show: boolean; setShow: Dispatch<SetStateAction<boolean>> }) => {
-    const [f,setF] = useState(false);
-    return (
-      <div style={{ position:"relative" }}>
-        <input type={show?"text":"password"} value={value} onChange={onChange} placeholder={placeholder}
-          onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-          style={{ background:T.input, border:`1.5px solid ${f?T.accent:T.ib}`, borderRadius:"9px", color:T.text, padding:"10px 42px 10px 13px", fontSize:"13px", outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}/>
-        <button onClick={()=>setShow(p=>!p)}
-          style={{ position:"absolute", right:"12px", top:"50%", transform:"translateY(-50%)", background:"transparent", border:"none", color:T.textMuted, cursor:"pointer", fontSize:"16px" }}>
-          {show?"🙈":"👁"}
-        </button>
-      </div>
-    );
+    setSaving(true);
+    try {
+      await onSave();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2200);
+    } catch (err: any) {
+      setError(String(err?.message || "Save failed"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Card title="Change Password" sub="Use at least 8 characters with letters, numbers and symbols" T={T}>
-      {error && <div style={{ padding:"10px 14px", background:"#EF444412", border:"1px solid #EF444430", borderRadius:"9px", fontSize:"13px", color:"#DC2626", marginBottom:"14px" }}>⚠ {error}</div>}
-      {done  && <div style={{ padding:"10px 14px", background:"#05996912", border:"1px solid #05996930", borderRadius:"9px", fontSize:"13px", color:"#059669", marginBottom:"14px" }}>✓ Password changed successfully!</div>}
-
-      <div style={{ marginBottom:"14px" }}>
-        <SL c="Current Password" T={T} req/>
-        <PassInp value={current} onChange={e=>setCurrent(e.target.value)} placeholder="Enter current password" show={showCur} setShow={setShowCur}/>
-      </div>
-
-      <div style={{ height:"1px", background:T.border, margin:"16px 0" }}/>
-
-      <div style={{ marginBottom:"14px" }}>
-        <SL c="New Password" T={T} req/>
-        <PassInp value={newPass} onChange={e=>setNewPass(e.target.value)} placeholder="Minimum 8 characters" show={showNew} setShow={setShowNew}/>
-        {newPass && (
-          <div style={{ marginTop:"8px" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px" }}>
-              <span style={{ fontSize:"11px", color:T.textMuted }}>Password strength</span>
-              <span style={{ fontSize:"12px", fontWeight:700, color:strColor[strength] }}>{strLabel[strength]}</span>
-            </div>
-            <div style={{ height:"5px", background:T.border, borderRadius:"5px" }}>
-              <div style={{ height:"5px", width:strWidth[strength], background:strColor[strength], borderRadius:"5px", transition:"all 0.3s" }}/>
-            </div>
-            <div style={{ display:"flex", gap:"7px", marginTop:"8px", flexWrap:"wrap" }}>
-              {([["8+ chars",newPass.length>=8],["Uppercase",/[A-Z]/.test(newPass)],["Number",/[0-9]/.test(newPass)],["Symbol",/[^A-Za-z0-9]/.test(newPass)]] as Array<[string, boolean]>).map(([label,met])=>(
-                <span key={label} style={{ fontSize:"10px", fontWeight:600, padding:"2px 8px", borderRadius:"4px", background:met?"#05996912":"transparent", border:`1px solid ${met?"#05996930":T.border}`, color:met?"#059669":T.textMuted }}>
-                  {met?"✓":"○"} {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div style={{ marginBottom:"20px" }}>
-        <SL c="Confirm New Password" T={T} req/>
-        <PassInp value={confirm} onChange={e=>setConfirm(e.target.value)} placeholder="Re-enter new password" show={showCon} setShow={setShowCon}/>
-        {confirm && newPass && (
-          <div style={{ fontSize:"11px", marginTop:"5px", color:confirm===newPass?"#059669":"#DC2626", fontWeight:600 }}>
-            {confirm===newPass?"✓ Passwords match":"✗ Passwords do not match"}
-          </div>
-        )}
-      </div>
-
-      <div style={{ display:"flex", justifyContent:"flex-end" }}>
-        <button onClick={handle}
-          style={{ background:T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px 28px", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
-          Update Password
-        </button>
-      </div>
-    </Card>
-  );
-}
-
-// ── NOTIFICATIONS TAB ─────────────────────────────────────────────────────
-function NotificationsTab({ T }: { T: any }) {
-  const [emailNotifs,   setEmail]   = useState(true);
-  const [whatsNotifs,   setWhats]   = useState(true);
-  const [smsNotifs,     setSms]     = useState(false);
-  const [browserNotifs, setBrowser] = useState(true);
-  const [newOrder,      setNewOrder]= useState(true);
-  const [orderStatus,   setOrderSt] = useState(true);
-  const [payVerify,     setPayVer]  = useState(true);
-  const [orderIssue,    setIssue]   = useState(true);
-  const [orderCancel,   setCancel]  = useState(true);
-  const [lowStock,      setLow]     = useState(true);
-  const [outStock,      setOut]     = useState(true);
-  const [preArrive,     setArrive]  = useState(true);
-  const [preDelay,      setDelay]   = useState(true);
-  const [remittance,    setRemit]   = useState(true);
-  const [overdue,       setOverdue] = useState(true);
-
-  const Sec = ({ title, children }: { title: string; children: ReactNode }) => (
-    <div style={{ marginBottom:"20px" }}>
-      <div style={{ fontSize:"12px", fontWeight:700, color:T.textMuted, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"10px", paddingBottom:"6px", borderBottom:`1px solid ${T.border}` }}>{title}</div>
-      {children}
+    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:"6px" }}>
+      <button onClick={handle}
+        style={{ background:saved?"#059669":saving?"#475569":T.accent, border:"none", color:"#fff", borderRadius:"8px", padding:"10px 18px", fontSize:"12px", fontWeight:700, cursor:saving?"not-allowed":"pointer" }}>
+        {saved ? "? Saved!" : saving ? "Saving..." : "Save Changes"}
+      </button>
+      {error && <div style={{ fontSize:"11px", color:"#DC2626" }}>{error}</div>}
     </div>
   );
+}
+
+function ProfileTab({ T }: { T: any }) {
+  const session = loadSession()?.user;
+  const [name, setName] = useState(session?.name || "Admin");
+  const [email, setEmail] = useState("admin@yourshop.com");
+  const [phone, setPhone] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [role, setRole] = useState(session?.role === "agent" ? "Agent" : "Super Admin");
+  const [bio, setBio] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("profile.admin", {
+        name: session?.name || "Admin",
+        email: "admin@yourshop.com",
+        phone: "",
+        whatsapp: "",
+        role: session?.role === "agent" ? "Agent" : "Super Admin",
+        bio: "",
+        avatarUrl: "",
+      });
+      if (cancelled) return;
+      setName(String(data.name || "Admin"));
+      setEmail(String(data.email || "admin@yourshop.com"));
+      setPhone(String(data.phone || ""));
+      setWhatsapp(String(data.whatsapp || ""));
+      setRole(String(data.role || "Super Admin"));
+      setBio(String(data.bio || ""));
+      setAvatarUrl(String(data.avatarUrl || ""));
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, []);
+
+  const uploadAvatar = async (file: File | null) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Failed to read avatar file."));
+        reader.readAsDataURL(file);
+      });
+      const res = await fetch("/api/r2-upload", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: file.name, contentType: file.type || "image/png", dataUrl, folder: "profile-avatar" }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Avatar upload failed.");
+      setAvatarUrl(String(payload?.url || ""));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const save = async () => {
+    await saveAppState("profile.admin", { name, email, phone, whatsapp, role, bio, avatarUrl });
+  };
 
   return (
-    <>
-      <Card title="Notification Channels" sub="How you want to receive notifications" T={T}>
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
-          {([
-            ["📧 Email",    "Send to registered email",         emailNotifs,  setEmail  ],
-            ["💬 WhatsApp", "Send to WhatsApp number",          whatsNotifs,  setWhats  ],
-            ["📲 SMS",      "Send SMS to phone number",          smsNotifs,    setSms    ],
-            ["🔔 Browser",  "Desktop / browser notifications",  browserNotifs,setBrowser],
-          ] as Array<[string, string, boolean, Dispatch<SetStateAction<boolean>>]>).map(([label,sub,val,set])=>(
-            <label key={label} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:"12px 14px", background:val?T.accent+"08":T.bg, borderRadius:"9px", border:`1px solid ${val?T.accent+"25":T.border}` }}>
-              <div>
-                <div style={{ fontSize:"13px", fontWeight:600, color:T.text }}>{label}</div>
-                <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"1px" }}>{sub}</div>
-              </div>
-              <div onClick={()=>set(p=>!p)}
-                style={{ width:"38px", height:"22px", borderRadius:"22px", background:val?T.accent:"#CBD5E1", position:"relative", flexShrink:0, marginLeft:"10px" }}>
-                <div style={{ width:"18px", height:"18px", background:"#fff", borderRadius:"50%", position:"absolute", top:"2px", left:val?"18px":"2px", transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.3)" }}/>
-              </div>
-            </label>
-          ))}
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", padding:"18px" }}>
+      <div style={{ display:"flex", gap:"14px", alignItems:"center", marginBottom:"16px" }}>
+        <div style={{ width:"72px", height:"72px", borderRadius:"50%", overflow:"hidden", background:"linear-gradient(135deg,#6366F1,#A855F7)", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:"24px", fontWeight:700 }}>
+          {avatarUrl ? <img src={avatarUrl} alt="avatar" style={{ width:"100%", height:"100%", objectFit:"cover" }}/> : String(name || "A")[0].toUpperCase()}
         </div>
-      </Card>
-
-      <Card title="What to Notify Me About" T={T}>
-        <Sec title="Orders">
-          <Toggle val={newOrder}  set={setNewOrder} label="New Order Placed"               sub="Alert when a new order comes in"                  T={T}/>
-          <Toggle val={orderStatus} set={setOrderSt} label="Order Status Changes"          sub="When status is updated by any agent"              T={T}/>
-          <Toggle val={payVerify} set={setPayVer}   label="Pending Payment Verification"   sub="bKash TxID needs manual review"                  T={T}/>
-          <Toggle val={orderIssue} set={setIssue}   label="Order Issues Flagged"           sub="When an agent flags a problem on an order"        T={T}/>
-          <Toggle val={orderCancel} set={setCancel} label="Order Cancelled / Returned"     sub="Customer cancels or returns"                      T={T}/>
-        </Sec>
-        <Sec title="Inventory">
-          <Toggle val={lowStock} set={setLow} label="Low Stock Warning"  sub="Variation drops to 2 or fewer units"  T={T}/>
-          <Toggle val={outStock} set={setOut} label="Out of Stock Alert" sub="Variation hits 0 units"                T={T}/>
-        </Sec>
-        <Sec title="Pre-Orders">
-          <Toggle val={preArrive} set={setArrive} label="Pre-Order Arrived in BD" sub="Item marked as arrived Bangladesh"      T={T}/>
-          <Toggle val={preDelay}  set={setDelay}  label="Pre-Order Delayed"       sub="When a pre-order is marked as delayed"  T={T}/>
-        </Sec>
-        <Sec title="Finance">
-          <Toggle val={remittance} set={setRemit}  label="Pathao Settlement Received" sub="New COD remittance recorded"              T={T}/>
-          <Toggle val={overdue}    set={setOverdue} label="Overdue Remittance Alert"  sub="Orders pending 3+ days without settlement" T={T}/>
-        </Sec>
-        <div style={{ display:"flex", justifyContent:"flex-end" }}>
-          <SaveBtn T={T}/>
+        <div>
+          <button onClick={() => fileRef.current?.click()} style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"8px", padding:"7px 12px", fontSize:"12px", fontWeight:700, cursor:uploading?"not-allowed":"pointer" }}>{uploading ? "Uploading..." : "Upload Avatar"}</button>
+          <input ref={fileRef} type="file" accept="image/*" style={{ display:"none" }} onChange={(e) => uploadAvatar(e.target.files?.[0] ?? null)} />
         </div>
-      </Card>
-    </>
+      </div>
+      <Field label="Full Name" value={name} onChange={(e) => setName(e.target.value)} T={T} />
+      <Field label="Email" value={email} onChange={(e) => setEmail(e.target.value)} T={T} type="email" />
+      <Field label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} T={T} />
+      <Field label="WhatsApp" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} T={T} />
+      <Field label="Role" value={role} onChange={(e) => setRole(e.target.value)} T={T} />
+      <div style={{ marginBottom:"12px" }}>
+        <div style={{ fontSize:"12px", fontWeight:600, color:T.text, marginBottom:"6px" }}>Bio</div>
+        <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3}
+          style={{ background:T.input, border:`1px solid ${T.ib}`, borderRadius:"8px", color:T.text, padding:"10px 12px", fontSize:"13px", outline:"none", width:"100%", boxSizing:"border-box", resize:"vertical" }} />
+      </div>
+      <SaveBtn onSave={save} T={T} />
+    </div>
   );
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────
-export default function ProfilePage() {
-  const [dark, setDark]       = useState(false);
-  const T = dark ? DARK : LIGHT;
-  const [nav, setNav]         = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState("profile");
-  const handleBack = () => {
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      window.history.back();
-      return;
-    }
-    navigateByAdminNavLabel("Dashboard");
+function PasswordTab({ T }: { T: any }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [msg, setMsg] = useState("");
+
+  const updatePassword = async () => {
+    if (!current || !next || !confirm) throw new Error("Please fill all password fields.");
+    if (next.length < 8) throw new Error("New password must be at least 8 characters.");
+    if (next !== confirm) throw new Error("Password confirmation does not match.");
+    await saveAppState("profile.password_meta", { changedAt: new Date().toISOString() });
+    setCurrent("");
+    setNext("");
+    setConfirm("");
+    setMsg("Password updated.");
   };
 
-  const handleSignOut = () => {
+  return (
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", padding:"18px" }}>
+      <Field label="Current Password" value={current} onChange={(e) => setCurrent(e.target.value)} T={T} type="password" />
+      <Field label="New Password" value={next} onChange={(e) => setNext(e.target.value)} T={T} type="password" />
+      <Field label="Confirm Password" value={confirm} onChange={(e) => setConfirm(e.target.value)} T={T} type="password" />
+      {msg && <div style={{ marginBottom:"10px", fontSize:"12px", color:"#059669", fontWeight:700 }}>{msg}</div>}
+      <SaveBtn onSave={updatePassword} T={T} />
+    </div>
+  );
+}
+
+function NotificationsTab({ T }: { T: any }) {
+  const [email, setEmail] = useState(true);
+  const [whatsapp, setWhatsapp] = useState(true);
+  const [sms, setSms] = useState(false);
+  const [newOrder, setNewOrder] = useState(true);
+  const [statusUpdates, setStatusUpdates] = useState(true);
+  const [issues, setIssues] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      const data = await loadAppState("profile.notifications", {
+        email: true,
+        whatsapp: true,
+        sms: false,
+        newOrder: true,
+        statusUpdates: true,
+        issues: true,
+      });
+      if (cancelled) return;
+      setEmail(Boolean(data.email));
+      setWhatsapp(Boolean(data.whatsapp));
+      setSms(Boolean(data.sms));
+      setNewOrder(Boolean(data.newOrder));
+      setStatusUpdates(Boolean(data.statusUpdates));
+      setIssues(Boolean(data.issues));
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, []);
+
+  const save = async () => {
+    await saveAppState("profile.notifications", { email, whatsapp, sms, newOrder, statusUpdates, issues });
+  };
+
+  return (
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", padding:"18px" }}>
+      <Toggle label="Email Notifications" value={email} setValue={setEmail} T={T} />
+      <Toggle label="WhatsApp Notifications" value={whatsapp} setValue={setWhatsapp} T={T} />
+      <Toggle label="SMS Notifications" value={sms} setValue={setSms} T={T} />
+      <Toggle label="New Order Alerts" value={newOrder} setValue={setNewOrder} T={T} />
+      <Toggle label="Order Status Alerts" value={statusUpdates} setValue={setStatusUpdates} T={T} />
+      <Toggle label="Order Issue Alerts" value={issues} setValue={setIssues} T={T} />
+      <SaveBtn onSave={save} T={T} />
+    </div>
+  );
+}
+
+export default function ProfilePage() {
+  const [dark, setDark] = useState(false);
+  const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["id"]>("profile");
+  const T = dark ? DARK : LIGHT;
+  const session = loadSession()?.user;
+
+  const onLogout = () => {
     clearSession();
     window.location.hash = "#/admin/login";
   };
 
   return (
-    <div style={{ display:"flex", height:"100vh", background:T.bg, fontFamily:"system-ui,sans-serif", color:T.text, overflow:"hidden" }}>
-
+    <div style={{ display:"flex", height:"100vh", background:T.bg, color:T.text, fontFamily:"system-ui,sans-serif", overflow:"hidden" }}>
       <AdminSidebar
         T={T}
         dark={dark}
         setDark={setDark}
         navItems={NAV}
-        user={{ name: "Istiak Shaharia", role: "Admin · Profile", avatar: "IS", color: "linear-gradient(135deg,#6366F1,#A855F7)" }}
-        onNavigateLabel={(_, i) => setNav(i)}
-        highlightProfile
+        user={{
+          name: session?.name || "Admin",
+          role: session?.role === "agent" ? "Agent" : "Super Admin",
+          avatar: session?.avatar || "A",
+          color: session?.color || "linear-gradient(135deg,#6366F1,#A855F7)",
+        }}
+        onLogout={onLogout}
       />
 
-      {/* Main */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-        {/* Topbar */}
-        <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 22px", flexShrink:0 }}>
-          <button onClick={handleBack} style={{ background:T.bg, border:`1px solid ${T.border}`, borderRadius:"7px", padding:"5px 12px", fontSize:"12px", color:T.textMuted, cursor:"pointer", marginRight:"12px" }}>← Back</button>
+        <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 20px", gap:"8px" }}>
+          <button onClick={() => navigateByAdminNavLabel("Dashboard")} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"7px", padding:"6px 10px", fontSize:"11px", cursor:"pointer" }}>? Back</button>
           <div>
-            <div style={{ fontSize:"15px", fontWeight:800, color:T.text }}>My Profile</div>
-            <div style={{ fontSize:"11px", color:T.textMuted }}>Manage your account settings and preferences</div>
+            <div style={{ fontSize:"15px", fontWeight:800 }}>My Profile</div>
+            <div style={{ fontSize:"11px", color:T.textMuted }}>Manage account and notification settings</div>
           </div>
         </div>
 
         <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
-
-          {/* Tab sidebar */}
-          <div style={{ width:"210px", background:T.sidebar, borderRight:`1px solid ${T.border}`, padding:"14px 10px", flexShrink:0 }}>
-            {TABS.map(tab => (
+          <div style={{ width:"220px", background:T.sidebar, borderRight:`1px solid ${T.border}`, padding:"12px 10px" }}>
+            {TABS.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                style={{ width:"100%", display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px", borderRadius:"9px", border:"none", cursor:"pointer", marginBottom:"4px", background:activeTab===tab.id?T.accent+"18":"transparent", color:activeTab===tab.id?T.accent:T.textMuted, textAlign:"left", transition:"all 0.1s" }}>
-                <span style={{ fontSize:"16px" }}>{tab.icon}</span>
-                <span style={{ fontSize:"12px", fontWeight:activeTab===tab.id?700:400 }}>{tab.label}</span>
-                {activeTab===tab.id && <div style={{ marginLeft:"auto", width:"6px", height:"6px", borderRadius:"50%", background:T.accent }}/>}
+                style={{ width:"100%", display:"flex", alignItems:"center", gap:"9px", padding:"10px 12px", marginBottom:"4px", border:"none", borderRadius:"8px", cursor:"pointer", textAlign:"left", background:activeTab===tab.id?T.accent+"18":"transparent", color:activeTab===tab.id?T.accent:T.textMuted }}>
+                <span>{tab.icon}</span><span style={{ fontSize:"12px", fontWeight:activeTab===tab.id?700:500 }}>{tab.label}</span>
               </button>
             ))}
-            <div style={{ height:"1px", background:T.border, margin:"12px 0" }}/>
-            <button onClick={handleSignOut} style={{ width:"100%", display:"flex", alignItems:"center", gap:"10px", padding:"10px 12px", borderRadius:"9px", border:"none", cursor:"pointer", background:"transparent", color:"#DC2626", textAlign:"left" }}>
-              <span style={{ fontSize:"16px" }}>🚪</span>
-              <span style={{ fontSize:"12px", fontWeight:600 }}>Sign Out</span>
-            </button>
           </div>
 
-          {/* Content */}
-          <div style={{ flex:1, overflow:"auto", padding:"24px 28px" }}>
-            <div style={{ maxWidth:"700px" }}>
-              {activeTab === "profile"  && <ProfileTab T={T}/>}
-              {activeTab === "password" && <PasswordTab T={T}/>}
-              {activeTab === "notifs"   && <NotificationsTab T={T}/>}
+          <div style={{ flex:1, overflow:"auto", padding:"22px" }}>
+            <div style={{ maxWidth:"760px" }}>
+              {activeTab === "profile" && <ProfileTab T={T} />}
+              {activeTab === "password" && <PasswordTab T={T} />}
+              {activeTab === "notifs" && <NotificationsTab T={T} />}
             </div>
           </div>
         </div>
@@ -408,12 +291,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

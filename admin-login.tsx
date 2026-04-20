@@ -39,7 +39,8 @@ const LOCK_MINUTES = 10;
 // screen: "login" | "forgot" | "reset_sent" | "success"
 
 export default function LoginPage() {
-  const isLocal = typeof window !== "undefined" && /localhost|127\.0\.0\.1/.test(window.location.hostname);
+  const showDemoAccounts =
+    String((import.meta as any).env?.VITE_SHOW_DEMO_ACCOUNTS || "").toLowerCase() === "true";
   const [dark,      setDark]      = useState(false);
   const T = dark ? DARK : LIGHT;
   const [screen,    setScreen]    = useState<"login" | "forgot" | "reset_sent" | "success">("login");
@@ -433,7 +434,7 @@ export default function LoginPage() {
             {loading ? "Signing in..." : "Sign In →"}
           </button>
 
-          {isLocal && (
+          {showDemoAccounts && (
             <>
               {/* Divider */}
               <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px" }}>
@@ -445,7 +446,7 @@ export default function LoginPage() {
               {/* Quick fill test accounts */}
               <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
                 {ACCOUNTS.map(a => (
-                  <button key={a.email} onClick={() => { setEmail(a.email); setPassword(a.password); setError(""); }}
+                  <button key={a.email} onClick={() => { setEmail(a.email); setPassword(""); setError(""); }}
                     style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 13px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:"9px", cursor:"pointer", textAlign:"left", transition:"border-color 0.1s" }}
                     onMouseEnter={e=>e.currentTarget.style.borderColor=a.color+"60"}
                     onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>

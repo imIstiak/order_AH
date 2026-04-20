@@ -1,4 +1,5 @@
-const ORDER_STORAGE_KEY = "shopadmin.orders.v1";
+const ORDER_STORAGE_KEY = "shopadmin.orders.v2";
+const ORDERS_UPDATED_EVENT = "shopadmin:orders-updated";
 
 type TimelineEvent = {
   status: string;
@@ -98,6 +99,70 @@ function saveOrderCollection(orders: HydratedOrder[]): void {
   window.localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(orders));
 }
 
+function notifyOrdersUpdated() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(ORDERS_UPDATED_EVENT));
+}
+
+async function syncOrderCollectionFromServer(seedOrders: StoreOrder[] = []): Promise<HydratedOrder[]> {
+  if (typeof window === "undefined") {
+    return seedOrders.map(hydrateOrder);
+  }
+
+  try {
+    const res = await fetch("/api/orders", { method: "GET", cache: "no-store" });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(payload?.error || "Failed to load orders from database.");
+    }
+
+    const orders = Array.isArray(payload?.orders)
+      ? payload.orders.map((order: StoreOrder) => hydrateOrder(order))
+      : seedOrders.map(hydrateOrder);
+
+    saveOrderCollection(orders);
+    notifyOrdersUpdated();
+    return orders;
+  } catch {
+    return loadOrderCollection(seedOrders);
+  }
+}
+
+async function persistOrderCollectionToServer(orders: HydratedOrder[]): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  saveOrderCollection(orders);
+  try {
+    await fetch("/api/orders", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ orders }),
+    });
+  } catch {
+    // Keep local cache even if network fails.
+  }
+  notifyOrdersUpdated();
+}
+
+async function appendOrderToServer(order: HydratedOrder): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  const current = loadOrderCollection([]);
+  saveOrderCollection([order, ...current]);
+
+  try {
+    await fetch("/api/orders", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ order }),
+    });
+  } catch {
+    // Keep local cache fallback.
+  }
+
+  notifyOrdersUpdated();
+}
+
 function appendTimelineEvent(order: StoreOrder, status: string, note?: string, actor?: string): HydratedOrder {
   const event: TimelineEvent = {
     status,
@@ -116,8 +181,12 @@ function appendTimelineEvent(order: StoreOrder, status: string, note?: string, a
 
 export {
   ORDER_STORAGE_KEY,
+  ORDERS_UPDATED_EVENT,
   loadOrderCollection,
   saveOrderCollection,
+  syncOrderCollectionFromServer,
+  persistOrderCollectionToServer,
+  appendOrderToServer,
   appendTimelineEvent,
 };
 export type { HydratedOrder, StoreOrder, TimelineEvent };

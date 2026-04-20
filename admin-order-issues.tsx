@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
-import { appendTimelineEvent, loadOrderCollection, saveOrderCollection } from "./core/order-store";
+import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
 
 const DARK = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)" };
@@ -12,11 +12,27 @@ export default function AdminOrderIssuesPage() {
   const [dark, setDark] = useState(false);
   const T = dark ? DARK : LIGHT;
   const [orders, setOrders] = useState(() => loadOrderCollection([]));
+  const [ordersHydrated, setOrdersHydrated] = useState(false);
   const [nav, setNav] = useState(1);
 
   useEffect(() => {
-    saveOrderCollection(orders as any);
-  }, [orders]);
+    let cancelled = false;
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer([]);
+      if (cancelled) return;
+      setOrders(synced as any);
+      setOrdersHydrated(true);
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ordersHydrated) return;
+    persistOrderCollectionToServer(orders as any);
+  }, [orders, ordersHydrated]);
 
   const issueOrders = orders.filter((o: any) => Boolean(o.issue));
 

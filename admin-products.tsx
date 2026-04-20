@@ -1,77 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { uploadImageToR2 } from "./core/r2-upload";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
 
-// ── Category tree: parent → sub-categories ────────────────────────────────
-const INIT_CAT_TREE = {
-  "Bags":        ["Tote Bags","Shoulder Bags","Backpacks","Clutches","Crossbody Bags"],
-  "Shoes":       ["Heels","Sneakers","Flats","Boots","Sandals"],
-  "Accessories": ["Jewelry","Belts","Scarves","Sunglasses","Hair Accessories"],
-  "Clothing":    ["Tops","Bottoms","Dresses","Outerwear"],
-};
+type NavEntry = [string, string];
+const NAV: NavEntry[] = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const AGENT_NAV: NavEntry[] = [["▦","Dashboard"],["≡","Orders"],["⬡","Products"],["◉","Customers"],["+","New Order"],["👤","Profile"]];
+const PRODUCT_UPLOADER_NAV: NavEntry[] = [["⬡","Products"]];
 
-const INIT_PRODUCTS = [
-  { id:"p1",  name:"Leather Tote Bag",      price:2500, costPrice:1100, category:"Bags",   subCategory:"Tote Bags",    img:"🛍️", bg:"#92400E", status:"active",  featuredPhoto:"",
-    sizes:["S","M","L"],              colors:["Black","Brown","Beige"],  sourceLink:"https://aliexpress.com/item/123",
-    stock:{"S-Black":3,"S-Brown":2,"S-Beige":0,"M-Black":0,"M-Brown":1,"M-Beige":4,"L-Black":2,"L-Brown":0,"L-Beige":1},
-    variantPhotos:{"Black":"","Brown":"","Beige":""},
-    descBlocks:[{type:"text",value:"Premium quality leather tote bag. Perfect for everyday use."},{type:"features",value:["Genuine leather","Magnetic snap closure","Inner zip pocket","Fits A4 documents"]}] },
-  { id:"p2",  name:"High Ankle Converse",   price:3200, costPrice:1400, category:"Shoes",  subCategory:"Sneakers",     img:"👟", bg:"#1E40AF", status:"active",  featuredPhoto:"",
-    sizes:["36","37","38","39","40"],  colors:["White","Black"],          sourceLink:"",
-    stock:{"36-White":2,"36-Black":1,"37-White":0,"37-Black":3,"38-White":5,"38-Black":0,"39-White":2,"39-Black":2,"40-White":0,"40-Black":1},
-    variantPhotos:{"White":"","Black":""},
-    descBlocks:[{type:"text",value:"Classic high ankle canvas sneakers."}] },
-  { id:"p3",  name:"Canvas Backpack",       price:2400, costPrice:900,  category:"Bags",   subCategory:"Backpacks",    img:"🎒", bg:"#065F46", status:"active",  featuredPhoto:"",
-    sizes:["M","L"],                  colors:["Olive","Grey","Navy"],    sourceLink:"",
-    stock:{"M-Olive":4,"M-Grey":2,"M-Navy":0,"L-Olive":1,"L-Grey":0,"L-Navy":3},
-    variantPhotos:{"Olive":"","Grey":"","Navy":""},
-    descBlocks:[{type:"text",value:"Durable canvas backpack for school, travel, and everyday use."}] },
-  { id:"p4",  name:"Silver Bracelet",       price:1800, costPrice:600,  category:"Accessories",subCategory:"Jewelry",  img:"📿", bg:"#6B21A8", status:"active",  featuredPhoto:"",
-    sizes:["Free"],                   colors:["Silver","Gold"],          sourceLink:"",
-    stock:{"Free-Silver":8,"Free-Gold":0},
-    variantPhotos:{"Silver":"","Gold":""},
-    descBlocks:[{type:"text",value:"Adjustable chain bracelet in silver and gold."}] },
-  { id:"p5",  name:"Quilted Shoulder Bag",  price:3500, costPrice:1500, category:"Bags",   subCategory:"Shoulder Bags",img:"👜", bg:"#9D174D", status:"active",  featuredPhoto:"",
-    sizes:["S","M"],                  colors:["Beige","Pink","Black"],   sourceLink:"",
-    stock:{"S-Beige":2,"S-Pink":0,"S-Black":1,"M-Beige":0,"M-Pink":3,"M-Black":2},
-    variantPhotos:{"Beige":"","Pink":"","Black":""},
-    descBlocks:[{type:"text",value:"Classic quilted shoulder bag with chain strap."}] },
-  { id:"p6",  name:"Platform Sneakers",     price:3800, costPrice:1700, category:"Shoes",  subCategory:"Sneakers",     img:"👠", bg:"#7C3AED", status:"active",  featuredPhoto:"",
-    sizes:["36","37","38","39","40"],  colors:["White","Black"],          sourceLink:"",
-    stock:{"36-White":0,"36-Black":0,"37-White":2,"37-Black":1,"38-White":0,"38-Black":3,"39-White":1,"39-Black":0,"40-White":2,"40-Black":1},
-    variantPhotos:{"White":"","Black":""},
-    descBlocks:[{type:"text",value:"Chunky platform sneakers with extra height."}] },
-  { id:"p7",  name:"Embroidered Clutch",    price:2200, costPrice:800,  category:"Bags",   subCategory:"Clutches",     img:"👝", bg:"#B91C1C", status:"active",  featuredPhoto:"",
-    sizes:["Free"],                   colors:["Red","Blue","Gold"],      sourceLink:"",
-    stock:{"Free-Red":3,"Free-Blue":1,"Free-Gold":0},
-    variantPhotos:{"Red":"","Blue":"","Gold":""},
-    descBlocks:[{type:"text",value:"Handcrafted embroidered evening clutch."}] },
-  { id:"p8",  name:"Ankle Strap Heels",     price:2800, costPrice:1200, category:"Shoes",  subCategory:"Heels",        img:"🥿", bg:"#B45309", status:"active",  featuredPhoto:"",
-    sizes:["36","37","38","39"],      colors:["Nude","Black"],           sourceLink:"",
-    stock:{"36-Nude":2,"36-Black":1,"37-Nude":0,"37-Black":4,"38-Nude":3,"38-Black":0,"39-Nude":1,"39-Black":2},
-    variantPhotos:{"Nude":"","Black":""},
-    descBlocks:[{type:"text",value:"Strappy ankle strap heels with cushioned insole."}] },
-  { id:"p9",  name:"Gold Chain Necklace",   price:2100, costPrice:700,  category:"Accessories",subCategory:"Jewelry",  img:"💛", bg:"#92400E", status:"active",  featuredPhoto:"",
-    sizes:["Free"],                   colors:["Gold","Rose Gold"],       sourceLink:"",
-    stock:{"Free-Gold":5,"Free-Rose Gold":2},
-    variantPhotos:{"Gold":"","Rose Gold":""},
-    descBlocks:[{type:"text",value:"Layered gold chain necklace. Lightweight and elegant."}] },
-  { id:"p10", name:"Woven Raffia Bag",      price:1900, costPrice:750,  category:"Bags",   subCategory:"Tote Bags",    img:"🧺", bg:"#78350F", status:"inactive",featuredPhoto:"",
-    sizes:["S","M","L"],              colors:["Natural","Black"],        sourceLink:"",
-    stock:{"S-Natural":3,"S-Black":2,"M-Natural":0,"M-Black":1,"L-Natural":4,"L-Black":0},
-    variantPhotos:{"Natural":"","Black":""},
-    descBlocks:[{type:"text",value:"Summer woven raffia tote."}] },
-];
-
-const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
-const AGENT_NAV = [["▦","Dashboard"],["≡","Orders"],["⬡","Products"],["◉","Customers"],["+","New Order"],["👤","Profile"]];
-const PRODUCT_UPLOADER_NAV = [["⬡","Products"]];
-
-const totalStock  = (p) => Object.values(p.stock).reduce((a,b)=>a+b,0);
+const totalStock  = (p: any): number => Object.values((p?.stock || {}) as Record<string, unknown>).reduce<number>((a,b)=>a+(Number(b)||0),0);
 const stockStatus = (p) => {
   const n = totalStock(p);
   if (n <= 0) return ["#FEE2E2", "#B91C1C", "Out of Stock"];
@@ -91,13 +32,39 @@ function parseCsvTokens(value) {
     .filter(Boolean);
 }
 
+function buildCategoryTreeFromProducts(products) {
+  const tree = {};
+  (Array.isArray(products) ? products : []).forEach((product) => {
+    const parent = String(product?.category || "").trim();
+    const child = String(product?.subCategory || "").trim();
+    if (!parent) return;
+    if (!Array.isArray(tree[parent])) {
+      tree[parent] = [];
+    }
+    if (child && !tree[parent].includes(child)) {
+      tree[parent].push(child);
+    }
+  });
+  return tree;
+}
+
 function PhotoUpload({ photo, onUpload, onRemove, size = "110px", T }) {
   const ref = useRef(null);
-  const h = (file) => {
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const h = async (file) => {
     if (!file) return;
-    const r = new FileReader();
-    r.onload = (ev) => onUpload(ev.target.result);
-    r.readAsDataURL(file);
+    try {
+      setUploadError("");
+      setUploading(true);
+      const url = await uploadImageToR2(file, "products");
+      onUpload(url);
+    } catch (error) {
+      setUploadError(error?.message || "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -118,6 +85,11 @@ function PhotoUpload({ photo, onUpload, onRemove, size = "110px", T }) {
           position: "relative",
         }}
       >
+        {uploading && (
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)", color: "#fff", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700 }}>
+            Uploading...
+          </div>
+        )}
         {photo ? (
           <>
             <img src={photo} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
@@ -155,6 +127,7 @@ function PhotoUpload({ photo, onUpload, onRemove, size = "110px", T }) {
           e.target.value = "";
         }}
       />
+      {uploadError && <div style={{ marginTop: "6px", color: "#DC2626", fontSize: "11px", lineHeight: 1.4 }}>{uploadError}</div>}
     </div>
   );
 }
@@ -236,6 +209,8 @@ function DescBlockWrap({ idx, badge, children, onMove, onDelete, T }) {
 function DescEditor({ blocks, onChange, T }) {
   const fileRef = useRef(null);
   const [waitImg, setWaitImg] = useState(null);
+  const [uploadingIdx, setUploadingIdx] = useState(null);
+  const [uploadError, setUploadError] = useState("");
   const upd    = (idx,val) => onChange(blocks.map((b,i)=>i===idx?{...b,value:val}:b));
   const add    = (type) => onChange([...blocks, type==="text"?{type:"text",value:""}:type==="heading"?{type:"heading",value:""}:type==="features"?{type:"features",value:[""]}:type==="image"?{type:"image",value:"",caption:""}:{type:"divider",value:""}]);
   const del    = (idx) => { if(blocks.length<=1) return; onChange(blocks.filter((_,i)=>i!==idx)); };
@@ -243,7 +218,7 @@ function DescEditor({ blocks, onChange, T }) {
   const updFeat = (bi,fi,v) => { const b={...blocks[bi],value:blocks[bi].value.map((f,i)=>i===fi?v:f)}; onChange(blocks.map((x,i)=>i===bi?b:x)); };
   const addFeat = (bi) => { const b={...blocks[bi],value:[...blocks[bi].value,""]}; onChange(blocks.map((x,i)=>i===bi?b:x)); };
   const delFeat = (bi,fi) => { const b={...blocks[bi],value:blocks[bi].value.filter((_,i)=>i!==fi)}; onChange(blocks.map((x,i)=>i===bi?b:x)); };
-  const TA = {background:T.input,border:`1.5px solid ${T.ib}`,borderRadius:"8px",color:T.text,padding:"9px 12px",fontSize:"12px",outline:"none",width:"100%",boxSizing:"border-box",resize:"vertical",fontFamily:"inherit"};
+  const TA: CSSProperties = {background:T.input,border:`1.5px solid ${T.ib}`,borderRadius:"8px",color:T.text,padding:"9px 12px",fontSize:"12px",outline:"none",width:"100%",boxSizing:"border-box",resize:"vertical",fontFamily:"inherit"};
   return (
     <div>
       <div style={{fontSize:"10px",color:T.textMuted,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:"10px"}}>This content appears on the product page on your website ↓</div>
@@ -279,7 +254,9 @@ function DescEditor({ blocks, onChange, T }) {
           <button key={type} onClick={()=>add(type)} style={{background:color+"15",border:`1px solid ${color}30`,color,borderRadius:"7px",padding:"6px 12px",fontSize:"11px",fontWeight:600,cursor:"pointer"}}>{label}</button>
         ))}
       </div>
-      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f&&waitImg!==null){const r=new FileReader();r.onload=ev=>{upd(waitImg,ev.target.result);setWaitImg(null);};r.readAsDataURL(f);}e.target.value="";}}/>
+      <input ref={fileRef} type="file" accept="image/*" style={{display:"none"}} onChange={async e=>{const f=e.target.files[0];if(f&&waitImg!==null){try{setUploadError("");setUploadingIdx(waitImg);const url=await uploadImageToR2(f,"products/description");upd(waitImg,url);}catch(error){setUploadError(error?.message||"Image upload failed.");}finally{setUploadingIdx(null);setWaitImg(null);}}e.target.value="";}}/>
+      {uploadingIdx!==null && <div style={{marginTop:"8px",fontSize:"11px",color:T.textMuted}}>Uploading image...</div>}
+      {uploadError && <div style={{marginTop:"8px",fontSize:"11px",color:"#DC2626"}}>{uploadError}</div>}
     </div>
   );
 }
@@ -307,9 +284,9 @@ function WebPreview({ name, price, category, subCategory, colors, featuredPhoto,
         <div style={{fontSize:"10px",color:T.textMuted,marginBottom:"2px"}}>{[category,subCategory].filter(Boolean).join(" › ")}</div>
         <div style={{fontSize:"16px",fontWeight:800,color:T.text,marginBottom:"3px"}}>{name||"Product Name"}</div>
         <div style={{display:"flex",alignItems:"center",gap:"8px",marginBottom:"12px",flexWrap:"wrap"}}>
-          {onSale&&liveSalePrice>0&&liveSalePrice<(parseInt(price)||0) ? (
+          {onSale&&salePrice>0&&salePrice<(parseInt(price)||0) ? (
             <>
-              <span style={{fontSize:"22px",fontWeight:800,color:"#EF4444"}}>৳{liveSalePrice.toLocaleString()}</span>
+              <span style={{fontSize:"22px",fontWeight:800,color:"#EF4444"}}>৳{salePrice.toLocaleString()}</span>
               <span style={{fontSize:"15px",color:T.textMuted,textDecoration:"line-through"}}>৳{(parseInt(price)||0).toLocaleString()}</span>
               <span style={{fontSize:"10px",background:"#EF4444",color:"#fff",fontWeight:800,padding:"2px 7px",borderRadius:"4px"}}>{liveSaleDisc}% OFF</span>
             </>
@@ -340,7 +317,7 @@ function SL({ c, T, req = false }) {
   );
 }
 
-function Inp({ T, style, ...props }) {
+function Inp({ T, style = {}, ...props }: { T: any; style?: CSSProperties; [key: string]: any }) {
   return (
     <input
       {...props}
@@ -361,7 +338,7 @@ function Inp({ T, style, ...props }) {
   );
 }
 
-function Sel({ T, style, children, ...props }) {
+function Sel({ T, style = {}, children, ...props }: { T: any; style?: CSSProperties; children?: any; [key: string]: any }) {
   return (
     <select
       {...props}
@@ -546,6 +523,9 @@ function EditPage({ product, isNew, T, catTree, onSave, onBack, onDelete, onAddP
   const [saleTo,       setSaleTo]       = useState(product.saleTo||"");
   const [showDel,      setShowDel]      = useState(false);
   const [activeTab,    setActiveTab]    = useState("info");
+  const [saving,       setSaving]       = useState(false);
+  const [saveError,    setSaveError]    = useState("");
+  const [saveInfo,     setSaveInfo]     = useState("");
 
   const stockChange = (key,val) => setStock(p=>({...p,[key]:val}));
   const photoChange = (color,val) => setVariantPhotos(p=>({...p,[color]:val}));
@@ -603,13 +583,24 @@ function EditPage({ product, isNew, T, catTree, onSave, onBack, onDelete, onAddP
     setStock(ns);
   };
 
-  const handleSave = () => onSave({...product,name,price:parseInt(price)||0,costPrice:parseInt(costPrice)||0,onSale,salePrice:parseInt(salePrice)||0,saleFrom,saleTo,category,subCategory,status,sourceLink,sizes,colors,stock,featuredPhoto,variantPhotos,descBlocks,img:product.img});
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError("");
+    setSaveInfo("");
+    const result = await onSave({...product,name,price:parseInt(price)||0,costPrice:parseInt(costPrice)||0,onSale,salePrice:parseInt(salePrice)||0,saleFrom,saleTo,category,subCategory,status,sourceLink,sizes,colors,stock,featuredPhoto,variantPhotos,descBlocks,img:product.img});
+    if (!result?.ok) {
+      setSaveError(result?.message || "Failed to save product.");
+    } else {
+      setSaveInfo(result.message || "Saved successfully.");
+    }
+    setSaving(false);
+  };
   const liveProfit     = (parseInt(price)||0)-(parseInt(costPrice)||0);
   const liveSalePrice  = parseInt(salePrice)||0;
   const liveSaleDisc   = liveSalePrice>0&&liveSalePrice<(parseInt(price)||0) ? Math.round(((parseInt(price)||0)-liveSalePrice)/(parseInt(price)||0)*100) : 0;
   const liveSaleProfit = liveSalePrice>0 ? liveSalePrice-(parseInt(costPrice)||0) : 0;
   const totalUnits = sizes.reduce((a,s)=>a+colors.reduce((b,c)=>b+(stock[`${s}-${c}`]||0),0),0);
-  const IS = {background:T.input,border:`1.5px solid ${T.ib}`,borderRadius:"8px",color:T.text,padding:"9px 12px",fontSize:"12px",outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit"};
+  const IS: CSSProperties = {background:T.input,border:`1.5px solid ${T.ib}`,borderRadius:"8px",color:T.text,padding:"9px 12px",fontSize:"12px",outline:"none",width:"100%",boxSizing:"border-box",fontFamily:"inherit"};
 
   return (
     <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
@@ -622,9 +613,14 @@ function EditPage({ product, isNew, T, catTree, onSave, onBack, onDelete, onAddP
         </div>
         <div style={{marginLeft:"auto",display:"flex",gap:"8px"}}>
           {!isNew&&<button onClick={()=>setShowDel(true)} style={{background:"#EF444415",border:"1px solid #EF444430",color:"#DC2626",borderRadius:"8px",padding:"7px 14px",fontSize:"12px",fontWeight:600,cursor:"pointer"}}>🗑 Delete</button>}
-          <button onClick={handleSave} style={{background:T.accent,border:"none",color:"#fff",borderRadius:"8px",padding:"8px 20px",fontSize:"12px",fontWeight:700,cursor:"pointer"}}>{isNew?"✓ Add Product":"✓ Save Changes"}</button>
+          <button disabled={saving} onClick={handleSave} style={{background:T.accent,border:"none",color:"#fff",borderRadius:"8px",padding:"8px 20px",fontSize:"12px",fontWeight:700,cursor:saving?"not-allowed":"pointer",opacity:saving?0.7:1}}>{saving?"Saving...":(isNew?"✓ Add Product":"✓ Save Changes")}</button>
         </div>
       </div>
+      {(saveError || saveInfo) && (
+        <div style={{padding:"8px 20px",borderBottom:`1px solid ${T.border}`,background:saveError?"#FEF2F2":"#ECFDF5",color:saveError?"#B91C1C":"#065F46",fontSize:"12px",fontWeight:700}}>
+          {saveError || saveInfo}
+        </div>
+      )}
       {/* Tabs */}
       <div style={{background:T.sidebar,borderBottom:`1px solid ${T.border}`,padding:"0 20px",display:"flex",gap:"0"}}>
         {[["info","📋 Info & Pricing"],["stock","📦 Stock & Photos"],["description","🌐 Product Page"]].map(([id,label])=>(
@@ -679,7 +675,7 @@ function EditPage({ product, isNew, T, catTree, onSave, onBack, onDelete, onAddP
                         addSize();
                       }
                     }} placeholder='Type one or many sizes. Example: 36,37,38 then press Enter' T={T} style={{flex:1}}/>
-                    <button onClick={addSize} style={{background:T.accent,border:"none",color:"#fff",borderRadius:"8px",padding:"9px 16px",fontSize:"12px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Add</button>
+                    <button onClick={() => addSize()} style={{background:T.accent,border:"none",color:"#fff",borderRadius:"8px",padding:"9px 16px",fontSize:"12px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Add</button>
                   </div>
                   <div style={{fontSize:"10px",color:T.textMuted,marginTop:"8px"}}>Tip: press Enter or comma to add quickly.</div>
                 </Box>
@@ -700,7 +696,7 @@ function EditPage({ product, isNew, T, catTree, onSave, onBack, onDelete, onAddP
                         addColor();
                       }
                     }} placeholder='Type one or many colors. Example: black,white,cream then press Enter' T={T} style={{flex:1}}/>
-                    <button onClick={addColor} style={{background:"#059669",border:"none",color:"#fff",borderRadius:"8px",padding:"9px 16px",fontSize:"12px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Add</button>
+                    <button onClick={() => addColor()} style={{background:"#059669",border:"none",color:"#fff",borderRadius:"8px",padding:"9px 16px",fontSize:"12px",fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}>+ Add</button>
                   </div>
                   <div style={{fontSize:"10px",color:T.textMuted,marginTop:"8px"}}>Tip: press Enter or comma to add quickly. "Default" is reserved for the featured image fallback.</div>
                 </Box>
@@ -941,26 +937,10 @@ function ProductRow({ product, onClick, T, showProfit = true }) {
 export default function ProductsPage() {
   const [dark, setDark]           = useState(false);
   const T = dark ? DARK : LIGHT;
-  const [products, setProducts]   = useState(() => {
-    try {
-      const raw = localStorage.getItem(PRODUCTS_STORAGE_KEY);
-      if (!raw) return INIT_PRODUCTS;
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) && parsed.length ? parsed : INIT_PRODUCTS;
-    } catch {
-      return INIT_PRODUCTS;
-    }
-  });
-  const [catTree, setCatTree]     = useState(() => {
-    try {
-      const raw = localStorage.getItem(CATEGORY_STORAGE_KEY);
-      if (!raw) return INIT_CAT_TREE;
-      const parsed = JSON.parse(raw);
-      return parsed && typeof parsed === "object" ? parsed : INIT_CAT_TREE;
-    } catch {
-      return INIT_CAT_TREE;
-    }
-  });
+  const [products, setProducts]   = useState([]);
+  const [catTree, setCatTree]     = useState({});
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [viewMode, setViewMode]   = useState("table");
   const [search, setSearch]       = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -987,20 +967,40 @@ export default function ProductsPage() {
   }, [isAgent, editProduct]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-    } catch {
-      // Ignore storage quota/runtime errors and keep in-memory state.
-    }
-  }, [products]);
+    let cancelled = false;
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(CATEGORY_STORAGE_KEY, JSON.stringify(catTree));
-    } catch {
-      // Ignore storage quota/runtime errors and keep in-memory state.
-    }
-  }, [catTree]);
+    const loadFromDb = async () => {
+      setLoadingProducts(true);
+      setLoadError("");
+      try {
+        const response = await fetch("/api/products");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to load products from database.");
+        }
+        if (cancelled) return;
+
+        const nextProducts = Array.isArray(payload?.products) ? payload.products : [];
+        const payloadTree = payload?.catTree && typeof payload.catTree === "object" ? payload.catTree : {};
+        const derivedTree = buildCategoryTreeFromProducts(nextProducts);
+        const nextCatTree = Object.keys(payloadTree).length ? payloadTree : derivedTree;
+        setProducts(nextProducts);
+        setCatTree(nextCatTree);
+      } catch (error) {
+        if (cancelled) return;
+        setLoadError(error?.message || "Database sync failed.");
+        setProducts((prev) => prev);
+        setCatTree((prev) => prev || {});
+      } finally {
+        if (!cancelled) setLoadingProducts(false);
+      }
+    };
+
+    loadFromDb();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // All parent cats + subs for the filter dropdown
   const allParents = Object.keys(catTree);
@@ -1028,16 +1028,50 @@ export default function ProductsPage() {
     ["Total Units",products.reduce((a,b)=>a+totalStock(b),0),                      "#0D9488"],
   ];
 
-  const handleSave = (updated) => {
-    if (isNew) setProducts(p=>[...p,{...updated,id:"p"+Date.now()}]);
-    else       setProducts(p=>p.map(x=>x.id===updated.id?updated:x));
-    setActionMsg(isNew ? "Product created successfully." : "Product updated successfully.");
-    setEditProduct(null); setIsNew(false);
+  const handleSave = async (updated) => {
+    try {
+      const method = isNew ? "POST" : "PUT";
+      const endpoint = isNew ? "/api/products" : `/api/products?id=${encodeURIComponent(updated.id)}`;
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to save product.");
+      }
+
+      const nextProducts = Array.isArray(payload?.products) ? payload.products : products;
+      setProducts(nextProducts);
+      if (payload?.catTree && typeof payload.catTree === "object") {
+        setCatTree(payload.catTree);
+      }
+      setActionMsg(isNew ? "Product upload successful. Product added to database." : "Product update successful. Changes saved to database.");
+      setEditProduct(null);
+      setIsNew(false);
+      return { ok: true, message: isNew ? "Product added successfully." : "Product saved successfully." };
+    } catch (error) {
+      const message = error?.message || "Failed to save product.";
+      setActionMsg(message);
+      return { ok: false, message };
+    }
   };
-  const handleDelete  = (id) => {
-    setProducts(p=>p.filter(x=>x.id!==id));
-    setActionMsg("Product deleted successfully.");
-    setEditProduct(null);
+  const handleDelete  = async (id) => {
+    try {
+      const response = await fetch(`/api/products?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.error || "Failed to delete product.");
+      }
+      setProducts(p=>p.filter(x=>x.id!==id));
+      setActionMsg("Product deleted from database.");
+      setEditProduct(null);
+    } catch (error) {
+      setActionMsg(error?.message || "Failed to delete product.");
+    }
   };
   const addParentCat  = (cat) => setCatTree(p=>({...p,[cat]:[]}));
   const addSubCat     = (parent,sub) => setCatTree(p=>({...p,[parent]:[...(p[parent]||[]),sub]}));
@@ -1048,7 +1082,7 @@ export default function ProductsPage() {
     setIsNew(true);
   };
 
-  const ISsmall = {background:T.input,border:`1px solid ${T.border}`,borderRadius:"7px",color:T.text,padding:"7px 10px",fontSize:"12px",outline:"none",boxSizing:"border-box",cursor:"pointer",fontFamily:"inherit"};
+  const ISsmall: CSSProperties = {background:T.input,border:`1px solid ${T.border}`,borderRadius:"7px",color:T.text,padding:"7px 10px",fontSize:"12px",outline:"none",boxSizing:"border-box",cursor:"pointer",fontFamily:"inherit"};
 
   if (editProduct && canEditProducts) return (
     <div style={{display:"flex",height:"100vh",background:T.bg,fontFamily:"system-ui,sans-serif",color:T.text,overflow:"hidden"}}>
@@ -1106,6 +1140,19 @@ export default function ProductsPage() {
             <h1 style={{margin:0,fontSize:"16px",fontWeight:800,color:T.text}}>Product Catalog</h1>
             <div style={{fontSize:"11px",color:T.textMuted,marginTop:"3px"}}>{isAgent ? "Browse products and stock availability" : "Manage products, stock levels, pricing and page content"}</div>
           </div>
+
+          {loadingProducts && (
+            <div style={{ marginBottom:"12px", padding:"12px", borderRadius:"10px", background:T.surface, border:`1px solid ${T.border}` }}>
+              <div style={{ display:"flex", alignItems:"center", gap:"8px", marginBottom:"8px" }}>
+                <span style={{ fontSize:"14px" }}>⏳</span>
+                <span style={{ fontSize:"12px", fontWeight:700, color:T.textMid }}>Loading products from database...</span>
+              </div>
+              <div style={{ height:"6px", borderRadius:"999px", background:T.bg, border:`1px solid ${T.border}`, overflow:"hidden" }}>
+                <div style={{ width:"55%", height:"100%", background:T.accent, borderRadius:"999px" }} />
+              </div>
+            </div>
+          )}
+          {loadError && <div style={{ marginBottom:"10px", padding:"9px 12px", borderRadius:"8px", background:"#FEF2F2", border:"1px solid #FCA5A5", fontSize:"12px", color:"#B91C1C" }}>{loadError}</div>}
 
             {actionMsg && (
               <div style={{ marginBottom:"12px", padding:"10px 12px", borderRadius:"8px", background:"#05966915", border:"1px solid #05966930", color:"#059669", fontSize:"12px", fontWeight:700, display:"flex", justifyContent:"space-between", alignItems:"center" }}>

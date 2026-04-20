@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
-import { appendTimelineEvent, loadOrderCollection, saveOrderCollection } from "./core/order-store";
+import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
 import { assignOrdersToBatch, createBatch, getOrderBatchMembership, listBatches } from "./core/batch-store";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
@@ -155,7 +155,10 @@ export default function App() {
   const [delOut, setDelOut] = useState(150);
   const due = (o) => calcDue(o, delIn, delOut);
 
-  const [orders, setOrders] = useState(() => loadOrderCollection(INIT));
+  const [catalog, setCatalog] = useState<any[]>([]);
+  const [catalogError, setCatalogError] = useState("");
+  const [orders, setOrders] = useState(() => loadOrderCollection([]));
+  const [ordersHydrated, setOrdersHydrated] = useState(false);
   const [tab, setTab]       = useState("all");
   const [sel, setSel]       = useState(new Set());
   const [search, setSearch] = useState("");
@@ -215,8 +218,59 @@ export default function App() {
   };
 
   useEffect(() => {
-    saveOrderCollection(orders);
-  }, [orders]);
+    let cancelled = false;
+    const hydrate = async () => {
+      const synced = await syncOrderCollectionFromServer([]);
+      if (cancelled) return;
+      setOrders(synced as any);
+      setOrdersHydrated(true);
+    };
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadCatalog = async () => {
+      setCatalogError("");
+      try {
+        const response = await fetch("/api/products", { cache: "no-store" });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || "Failed to load product catalog.");
+        }
+        if (cancelled) return;
+        const nextCatalog = Array.isArray(payload?.products)
+          ? payload.products.map((p: any) => ({
+              id: String(p?.id || ""),
+              name: String(p?.name || "Unnamed Product"),
+              price: Number(p?.price) || 0,
+              sizes: Array.isArray(p?.sizes) && p.sizes.length ? p.sizes : ["Free"],
+              colors: Array.isArray(p?.colors) && p.colors.length ? p.colors : ["Default"],
+              img: String(p?.img || "🛍️"),
+              bg: String(p?.bg || "#334155"),
+            }))
+          : [];
+        setCatalog(nextCatalog.filter((p: any) => p.id));
+      } catch (error: any) {
+        if (cancelled) return;
+        setCatalog([]);
+        setCatalogError(String(error?.message || "Product catalog unavailable."));
+      }
+    };
+
+    loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ordersHydrated) return;
+    persistOrderCollectionToServer(orders as any);
+  }, [orders, ordersHydrated]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -237,7 +291,12 @@ export default function App() {
     if (srcFilter && o.source !== srcFilter) return false;
     if (dateFrom  && o.date < dateFrom)      return false;
     if (dateTo    && o.date > dateTo)        return false;
-    if (search) { const q = search.toLowerCase(); if (!o.num.includes(q) && !o.customer.toLowerCase().includes(q) && !o.phone.includes(q)) return false; }
+    if (search) {
+      const q = search.toLowerCase();
+      const matchesCore = o.num.includes(q) || o.customer.toLowerCase().includes(q) || o.phone.includes(q);
+      const matchesProduct = Array.isArray(o.items) && o.items.some((item) => String(item?.name || "").toLowerCase().includes(q));
+      if (!matchesCore && !matchesProduct) return false;
+    }
     return true;
   });
 
@@ -264,7 +323,7 @@ export default function App() {
 
   const addProduct = () => {
     if (!addPid || !addSize || !addColor) return;
-    const prod = getProd(addPid);
+    const prod = catalog.find((entry) => entry.id === addPid) || null;
     if (!prod) return;
     setEditItems(p => [...p, { pid:prod.id, name:prod.name, size:addSize, color:addColor, qty:addQty, price:prod.price }]);
     setAddSearch("");
@@ -405,8 +464,8 @@ export default function App() {
   const clearFilters  = () => { setStFilter(""); setSrcFilter(""); setDateFrom(""); setDateTo(""); };
 
   const editOrder  = orders.find(o => o.id === editId) || null;
-  const selProd    = getProd(addPid);
-  const filteredCatalog = CATALOG.filter((p) => {
+  const selProd    = catalog.find((entry) => entry.id === addPid) || null;
+  const filteredCatalog = catalog.filter((p) => {
     const q = addSearch.trim().toLowerCase();
     if (!q) return true;
     return p.name.toLowerCase().includes(q);
@@ -875,6 +934,7 @@ export default function App() {
               <div style={{ marginBottom:"9px" }}>
                 <SLabel c="Search Product" T={T} />
                 <input value={addSearch} onChange={e => setAddSearch(e.target.value)} placeholder="Type product name..." style={{ ...IS, marginBottom:"8px" }} />
+                {catalogError && <div style={{ marginBottom:"7px", fontSize:"11px", color:"#D97706" }}>Catalog sync warning: {catalogError}</div>}
                 <SLabel c="Matching Products" T={T} />
                 <div style={{ maxHeight:"150px", overflowY:"auto", border:`1px solid ${T.border}`, borderRadius:"8px", background:T.surface }}>
                   {filteredCatalog.length === 0 && <div style={{ padding:"10px 11px", fontSize:"11px", color:T.textMuted }}>No products found for "{addSearch}".</div>}

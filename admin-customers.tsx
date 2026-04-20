@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, Dispatch, SetStateAction } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
@@ -388,7 +389,8 @@ export default function CustomersPage() {
   const userRole = isAgent ? "Agent" : "Super Admin";
   const userAvatar = sessionUser?.avatar || "A";
   const userColor = sessionUser?.color || "linear-gradient(135deg,#6366F1,#A855F7)";
-  const [customers, setCustomers]     = useState<Customer[]>(INIT_CUSTOMERS);
+  const [customers, setCustomers]     = useState<Customer[]>([]);
+  const [customersReady, setCustomersReady] = useState(false);
   const [selected,  setSelected]      = useState<Customer | null>(null);
   const [search,    setSearch]        = useState("");
   const [filter,    setFilter]        = useState("all");
@@ -399,6 +401,28 @@ export default function CustomersPage() {
     window.location.hash = "#/admin/login";
     window.dispatchEvent(new Event("hashchange"));
   };
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const loaded = await loadAppState<Customer[]>("customers.list", []);
+      if (!mounted) {
+        return;
+      }
+      setCustomers(Array.isArray(loaded) ? loaded : []);
+      setCustomersReady(true);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!customersReady) {
+      return;
+    }
+    void saveAppState("customers.list", customers);
+  }, [customers, customersReady]);
 
   const filtered = customers
     .filter(c => {

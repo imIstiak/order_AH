@@ -1,375 +1,293 @@
-import { useState, type ReactNode } from "react";
-import { navigateByAdminNavLabel } from "./core/nav-routes";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AdminSidebar from "./core/admin-sidebar";
+import { clearSession, loadSession } from "./core/auth-session";
+import { navigateByAdminNavLabel } from "./core/nav-routes";
+import { loadAppState, saveAppState } from "./core/app-state-client";
 
-const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
-const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
+type Theme = {
+  bg: string;
+  surface: string;
+  sidebar: string;
+  border: string;
+  text: string;
+  textMid: string;
+  textMuted: string;
+  accent: string;
+  tHead: string;
+  rowHover: string;
+};
 
-const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const LIGHT: Theme = {
+  bg: "#F6F7FB",
+  surface: "#FFFFFF",
+  sidebar: "#FFFFFF",
+  border: "#E2E8F0",
+  text: "#0F172A",
+  textMid: "#334155",
+  textMuted: "#64748B",
+  accent: "#6366F1",
+  tHead: "#F8FAFC",
+  rowHover: "#F8FAFC",
+};
 
-const ROLES = {
+const DARK: Theme = {
+  bg: "#0B1020",
+  surface: "#111827",
+  sidebar: "#0F172A",
+  border: "#243244",
+  text: "#E2E8F0",
+  textMid: "#CBD5E1",
+  textMuted: "#94A3B8",
+  accent: "#818CF8",
+  tHead: "#1E293B",
+  rowHover: "#172132",
+};
+
+const NAV = [
+  "Dashboard",
+  "Order Management",
+  "Products",
+  "Customers",
+  "Coupons",
+  "Batches",
+  "Remittance",
+  "Settings",
+  "Profile",
+  "Team",
+] as const;
+
+type RoleKey = "admin" | "agent" | "viewer";
+type MemberStatus = "active" | "inactive";
+
+type TeamActivity = {
+  action: string;
+  time: string;
+};
+
+type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: RoleKey;
+  status: MemberStatus;
+  joinedAt: string;
+  lastActive: string;
+  ordersHandled: number;
+  ordersThisMonth: number;
+  revenueThisMonth: number;
+  avgResponseTime: string;
+  avatar: string;
+  avatarColor: string;
+  recentActivity: TeamActivity[];
+};
+
+const ROLES: Record<RoleKey, { label: string; color: string; permissions: string[] }> = {
   admin: {
-    label:"Admin",
-    color:"#6366F1",
-    permissions:["View Dashboard","Manage Orders","Manage Products","Manage Customers","View Analytics","Manage Coupons","Manage Settings","Manage Team","View Remittance","Process Refunds"],
+    label: "Admin",
+    color: "#6366F1",
+    permissions: ["Manage users", "Manage orders", "Manage products", "View analytics", "Manage settings"],
   },
   agent: {
-    label:"Agent",
-    color:"#059669",
-    permissions:["View Dashboard","Create Orders","Update Order Status","View Customers","View Products"],
+    label: "Agent",
+    color: "#059669",
+    permissions: ["Manage orders", "View customers", "View products"],
   },
   viewer: {
-    label:"Viewer",
-    color:"#D97706",
-    permissions:["View Dashboard","View Orders","View Products","View Customers"],
+    label: "Viewer",
+    color: "#D97706",
+    permissions: ["View dashboard", "View reports"],
   },
 };
 
-      <AdminSidebar
-        T={T}
-        dark={dark}
-        setDark={setDark}
-        navItems={NAV}
-        user={{ name: "Istiak", role: "Admin", avatar: "IS", color: "#6366F1" }}
-        onNavigateLabel={(_, i) => setNav(i)}
-      />
+const ALL_PERMISSIONS: Array<[string, string]> = [
+  ["Manage users", "Invite/remove team members and adjust role"],
+  ["Manage orders", "Create and update orders"],
+  ["Manage products", "Create and edit products"],
+  ["View analytics", "Access analytics pages"],
+  ["Manage settings", "Change system configuration"],
+  ["View customers", "Access customer profiles"],
+  ["View products", "View product catalog only"],
+  ["View dashboard", "Read-only dashboard access"],
+  ["View reports", "Read-only reporting access"],
 ];
 
-const ALL_PERMISSIONS = [
-  ["View Dashboard",       "See revenue, stats and action items"],
-  ["Create Orders",        "Create new orders from admin panel"],
-  ["Update Order Status",  "Change order status and add notes"],
-  ["Manage Orders",        "Full order management incl. delete"],
-  ["View Products",        "Browse product catalog"],
-  ["Manage Products",      "Add, edit and delete products"],
-  ["View Customers",       "View customer list and profiles"],
-  ["Manage Customers",     "Edit customer data, flag, blacklist"],
-  ["View Analytics",       "Access analytics and reports"],
-  ["Manage Coupons",       "Create and manage discount codes"],
-  ["View Remittance",      "View COD remittance tracker"],
-  ["Manage Settings",      "Change system settings"],
-  ["Manage Team",          "Add, remove, change team roles"],
-  ["Process Refunds",      "Issue refunds and cancel orders"],
+const INIT_TEAM: TeamMember[] = [
+  {
+    id: "t-admin-1",
+    name: "Istiak Rahman",
+    email: "istiak@shopadmin.test",
+    phone: "01700000000",
+    role: "admin",
+    status: "active",
+    joinedAt: "03 Mar 2025",
+    lastActive: "Today, 10:41 AM",
+    ordersHandled: 132,
+    ordersThisMonth: 41,
+    revenueThisMonth: 467200,
+    avgResponseTime: "4m",
+    avatar: "IR",
+    avatarColor: "#6366F1",
+    recentActivity: [
+      { action: "Updated order workflow", time: "Today, 09:50 AM" },
+      { action: "Approved coupon edits", time: "Yesterday" },
+    ],
+  },
+  {
+    id: "t-agent-1",
+    name: "Nadia Islam",
+    email: "nadia@shopadmin.test",
+    phone: "01800000000",
+    role: "agent",
+    status: "active",
+    joinedAt: "19 Feb 2025",
+    lastActive: "Today, 09:22 AM",
+    ordersHandled: 98,
+    ordersThisMonth: 36,
+    revenueThisMonth: 313600,
+    avgResponseTime: "7m",
+    avatar: "NI",
+    avatarColor: "#059669",
+    recentActivity: [
+      { action: "Resolved pending order", time: "Today, 09:10 AM" },
+      { action: "Called customer", time: "Yesterday" },
+    ],
+  },
+  {
+    id: "t-viewer-1",
+    name: "Fahim Hasan",
+    email: "fahim@shopadmin.test",
+    phone: "01900000000",
+    role: "viewer",
+    status: "inactive",
+    joinedAt: "08 Jan 2025",
+    lastActive: "10 days ago",
+    ordersHandled: 0,
+    ordersThisMonth: 0,
+    revenueThisMonth: 0,
+    avgResponseTime: "-",
+    avatar: "FH",
+    avatarColor: "#D97706",
+    recentActivity: [{ action: "Account deactivated", time: "10 days ago" }],
+  },
 ];
 
-// ── SUB-COMPONENTS ────────────────────────────────────────────────────────
+const TEAM_STATE_KEY = "team.members";
 
-function Avatar({ initials, color, size }) {
-  const sz = size || 40;
+function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
   return (
-    <div style={{ width:sz, height:sz, borderRadius:"50%", background:color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:sz*0.32, fontWeight:800, flexShrink:0, letterSpacing:"0.5px" }}>
+    <div
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "999px",
+        background: color,
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: `${Math.max(11, Math.floor(size * 0.32))}px`,
+        fontWeight: 800,
+      }}
+    >
       {initials}
     </div>
   );
 }
 
-function RoleBadge({ role, T }) {
-  const r = ROLES[role];
-  return <span style={{ fontSize:"12px", fontWeight:700, padding:"2px 8px", borderRadius:"4px", background:r.color+"18", color:r.color }}>{r.label}</span>;
+function RoleBadge({ role }: { role: RoleKey }) {
+  const cfg = ROLES[role];
+  return (
+    <span
+      style={{
+        fontSize: "10px",
+        fontWeight: 700,
+        color: cfg.color,
+        background: `${cfg.color}18`,
+        border: `1px solid ${cfg.color}33`,
+        borderRadius: "999px",
+        padding: "2px 7px",
+      }}
+    >
+      {cfg.label}
+    </span>
+  );
 }
 
-function StatusDot({ status }) {
+function StatusDot({ status }: { status: MemberStatus }) {
+  const active = status === "active";
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:"5px" }}>
-      <div style={{ width:"7px", height:"7px", borderRadius:"50%", background:status==="active"?"#059669":"#64748B" }}/>
-      <span style={{ fontSize:"11px", color:status==="active"?"#059669":"#64748B", fontWeight:600 }}>{status==="active"?"Active":"Inactive"}</span>
+    <span style={{ fontSize: "10px", fontWeight: 700, color: active ? "#059669" : "#64748B" }}>
+      {active ? "ACTIVE" : "INACTIVE"}
+    </span>
+  );
+}
+
+function LabeledInput({
+  label,
+  value,
+  onChange,
+  T,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  T: Theme;
+  type?: string;
+}) {
+  return (
+    <div>
+      <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "5px", fontWeight: 700 }}>{label}</div>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        type={type}
+        style={{
+          width: "100%",
+          padding: "9px 10px",
+          borderRadius: "8px",
+          border: `1px solid ${T.border}`,
+          background: T.bg,
+          color: T.text,
+          fontSize: "12px",
+        }}
+      />
     </div>
   );
 }
 
-function SL({ c, T, req }) {
-  return <div style={{ fontSize:"11px", fontWeight:600, color:T.text, marginBottom:"5px" }}>{c}{req&&<span style={{ color:"#EF4444", marginLeft:"3px" }}>*</span>}</div>;
-}
-
-function Inp({ value, onChange, placeholder = "", T, type = "text" }: { value: any; onChange: (e: any) => void; placeholder?: string; T: any; type?: string }) {
-  const [f,setF] = useState(false);
-  return <input type={type} value={value} onChange={onChange} placeholder={placeholder}
-    onFocus={()=>setF(true)} onBlur={()=>setF(false)}
-    style={{ background:T.input, border:`1.5px solid ${f?T.accent:T.ib}`, borderRadius:"8px", color:T.text, padding:"9px 12px", fontSize:"12px", outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" }}/>;
-}
-
-type TeamMember = (typeof INIT_TEAM)[number];
-
-// ── MEMBER DETAIL PANEL ───────────────────────────────────────────────────
-function MemberPanel({ member, onClose, onUpdate, onRemove, T }) {
-  const [role,   setRole]   = useState(member.role);
-  const [status, setStatus] = useState(member.status);
-  const [saved,  setSaved]  = useState(false);
-  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
-  const [showResetConfirm,  setShowResetConfirm]  = useState(false);
-  const [resetDone, setResetDone] = useState(false);
-
-  const save = () => {
-    onUpdate({ ...member, role, status });
-    setSaved(true); setTimeout(() => setSaved(false), 2000);
-  };
-
-  const roleInfo = ROLES[role];
-
+function PermissionsTable({ T }: { T: Theme }) {
   return (
-    <div style={{ width:"380px", background:T.sidebar, borderLeft:`1px solid ${T.border}`, display:"flex", flexDirection:"column", flexShrink:0 }}>
-      {/* Header */}
-      <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
-        <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Team Member</span>
-        <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>✕</button>
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: "12px", overflow: "hidden" }}>
+      <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: "13px", fontWeight: 700, color: T.text }}>Role Permissions</div>
       </div>
-
-      <div style={{ flex:1, overflow:"auto", padding:"18px" }}>
-
-        {/* Identity */}
-        <div style={{ display:"flex", alignItems:"center", gap:"14px", marginBottom:"18px", padding:"14px", background:T.bg, borderRadius:"10px" }}>
-          <Avatar initials={member.avatar} color={member.avatarColor} size={52}/>
-          <div>
-            <div style={{ fontSize:"16px", fontWeight:800, color:T.text, marginBottom:"3px" }}>{member.name}</div>
-            <div style={{ fontSize:"11px", color:T.textMuted, marginBottom:"5px" }}>📧 {member.email}</div>
-            <div style={{ fontSize:"11px", color:T.textMuted }}>📞 {member.phone}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 90px 90px 90px", padding: "9px 16px", background: T.tHead, borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ fontSize: "11px", color: T.textMuted, fontWeight: 700, textTransform: "uppercase" }}>Permission</div>
+        {(["admin", "agent", "viewer"] as RoleKey[]).map((role) => (
+          <div key={role} style={{ fontSize: "11px", textAlign: "center", color: ROLES[role].color, fontWeight: 700 }}>
+            {ROLES[role].label}
           </div>
-        </div>
-
-        {/* Stats */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"7px", marginBottom:"16px" }}>
-          {[
-            ["Total Orders",   member.ordersHandled,                              T.accent],
-            ["This Month",     member.ordersThisMonth,                            "#0D9488"],
-            ["Revenue (Month)","৳"+member.revenueThisMonth.toLocaleString(),     "#059669"],
-            ["Avg Response",   member.avgResponseTime,                            "#D97706"],
-          ].map(([label,val,color]) => (
-            <div key={label} style={{ background:T.bg, borderRadius:"8px", padding:"10px 12px" }}>
-              <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.4px", marginBottom:"4px" }}>{label}</div>
-              <div style={{ fontSize:"16px", fontWeight:800, color }}>{val}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Role */}
-        <div style={{ marginBottom:"14px" }}>
-          <SL c="Role" T={T} req/>
-          <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
-            {Object.entries(ROLES).map(([id, r]) => (
-              <div key={id} onClick={() => setRole(id)}
-                style={{ padding:"11px 13px", borderRadius:"9px", border:`2px solid ${role===id?r.color:T.border}`, background:role===id?r.color+"10":T.bg, cursor:"pointer", transition:"all 0.12s" }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"5px" }}>
-                  <span style={{ fontSize:"13px", fontWeight:700, color:role===id?r.color:T.text }}>{r.label}</span>
-                  <div style={{ width:"16px", height:"16px", borderRadius:"50%", border:`2px solid ${role===id?r.color:T.border}`, background:role===id?r.color:"transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    {role===id && <div style={{ width:"7px", height:"7px", borderRadius:"50%", background:"#fff" }}/>}
-                  </div>
-                </div>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:"4px" }}>
-                  {r.permissions.slice(0,4).map(p => (
-                    <span key={p} style={{ fontSize:"9px", padding:"1px 6px", borderRadius:"3px", background:role===id?r.color+"15":T.tHead, color:role===id?r.color:T.textMuted }}>✓ {p}</span>
-                  ))}
-                  {r.permissions.length > 4 && (
-                    <span style={{ fontSize:"9px", padding:"1px 6px", borderRadius:"3px", color:T.textMuted }}>+{r.permissions.length-4} more</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Status toggle */}
-        <div style={{ marginBottom:"16px" }}>
-          <label style={{ display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", padding:"10px 13px", background:status==="active"?"#05996910":T.bg, borderRadius:"9px", border:`1px solid ${status==="active"?"#05996930":T.border}` }}>
-            <div>
-              <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>Account Active</div>
-              <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"1px" }}>Inactive members cannot log in</div>
-            </div>
-            <div onClick={() => setStatus(p => p==="active"?"inactive":"active")}
-              style={{ width:"38px", height:"22px", borderRadius:"22px", background:status==="active"?"#059669":"#CBD5E1", position:"relative", transition:"background 0.2s", flexShrink:0 }}>
-              <div style={{ width:"18px", height:"18px", background:"#fff", borderRadius:"50%", position:"absolute", top:"2px", left:status==="active"?"18px":"2px", transition:"left 0.2s", boxShadow:"0 1px 3px rgba(0,0,0,0.3)" }}/>
-            </div>
-          </label>
-        </div>
-
-        <button onClick={save}
-          style={{ width:"100%", background:saved?"#059669":T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px", fontSize:"13px", fontWeight:700, cursor:"pointer", marginBottom:"14px", transition:"background 0.2s" }}>
-          {saved ? "✓ Saved!" : "Save Changes"}
-        </button>
-
-        {/* Danger zone */}
-        <div style={{ border:`1px solid #EF444430`, borderRadius:"10px", padding:"14px", marginBottom:"16px" }}>
-          <div style={{ fontSize:"12px", fontWeight:700, color:"#DC2626", marginBottom:"10px" }}>⚠ Danger Zone</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-            {/* Reset password */}
-            {!showResetConfirm ? (
-              <button onClick={() => setShowResetConfirm(true)}
-                style={{ background:"transparent", border:"1px solid #EF444430", color:"#DC2626", borderRadius:"7px", padding:"9px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer", textAlign:"left" }}>
-                🔑 Send Password Reset Link
-              </button>
-            ) : resetDone ? (
-              <div style={{ padding:"9px 14px", background:"#05996910", borderRadius:"7px", fontSize:"12px", color:"#059669", fontWeight:600 }}>
-                ✓ Reset link sent to {member.email}
-              </div>
-            ) : (
-              <div style={{ background:"#EF444410", borderRadius:"7px", padding:"10px 12px" }}>
-                <div style={{ fontSize:"11px", color:"#DC2626", marginBottom:"8px" }}>Send reset link to {member.email}?</div>
-                <div style={{ display:"flex", gap:"7px" }}>
-                  <button onClick={() => { setShowResetConfirm(false); }} style={{ flex:1, background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"7px", fontSize:"11px", cursor:"pointer" }}>Cancel</button>
-                  <button onClick={() => { setResetDone(true); setShowResetConfirm(false); }} style={{ flex:1, background:"#EF4444", border:"none", color:"#fff", borderRadius:"6px", padding:"7px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Send Link</button>
-                </div>
-              </div>
-            )}
-
-            {/* Remove member */}
-            {!showRemoveConfirm ? (
-              <button onClick={() => setShowRemoveConfirm(true)}
-                style={{ background:"transparent", border:"1px solid #EF444430", color:"#DC2626", borderRadius:"7px", padding:"9px 14px", fontSize:"12px", fontWeight:600, cursor:"pointer", textAlign:"left" }}>
-                🗑 Remove from Team
-              </button>
-            ) : (
-              <div style={{ background:"#EF444410", borderRadius:"7px", padding:"10px 12px" }}>
-                <div style={{ fontSize:"11px", color:"#DC2626", marginBottom:"8px" }}>Remove {member.name} from the team? They will lose all access.</div>
-                <div style={{ display:"flex", gap:"7px" }}>
-                  <button onClick={() => setShowRemoveConfirm(false)} style={{ flex:1, background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"7px", fontSize:"11px", cursor:"pointer" }}>Cancel</button>
-                  <button onClick={() => { onRemove(member.id); }} style={{ flex:1, background:"#EF4444", border:"none", color:"#fff", borderRadius:"6px", padding:"7px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Remove</button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Recent activity */}
-        <div>
-          <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"8px" }}>Recent Activity</div>
-          <div style={{ display:"flex", flexDirection:"column", gap:"0" }}>
-            {member.recentActivity.map((a, i) => (
-              <div key={i} style={{ display:"flex", gap:"10px", padding:"8px 0", borderBottom:i<member.recentActivity.length-1?`1px solid ${T.border}`:"none" }}>
-                <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:T.accent, flexShrink:0, marginTop:"5px" }}/>
-                <div>
-                  <div style={{ fontSize:"12px", color:T.text }}>{a.action}</div>
-                  <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"2px" }}>{a.time}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── INVITE MODAL ─────────────────────────────────────────────────────────
-function InviteModal({ onInvite, onClose, T }) {
-  const [name,  setName]  = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [role,  setRole]  = useState("agent");
-  const [done,  setDone]  = useState(false);
-
-  const canSend = name.trim() && email.trim() && phone.trim();
-
-  const handle = () => {
-    if (!canSend) return;
-    const initials = name.trim().split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase();
-    const colors   = ["#6366F1","#059669","#D97706","#0D9488","#A855F7"];
-    onInvite({
-      id: "t"+Date.now(), name:name.trim(), email:email.trim(), phone:phone.trim(),
-      role, status:"active", joinedAt:"17 Apr 2025", lastActive:"Never",
-      ordersHandled:0, ordersThisMonth:0, revenueThisMonth:0, avgResponseTime:"—",
-      avatar:initials, avatarColor:colors[Math.floor(Math.random()*colors.length)],
-      recentActivity:[{ action:"Account created", time:"17 Apr, just now" }],
-    });
-    setDone(true);
-  };
-
-  return (
-    <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }} onClick={onClose}/>
-      <div style={{ position:"relative", background:T.surface, border:`1px solid ${T.border}`, borderRadius:"14px", width:"460px", maxWidth:"95vw", zIndex:1, overflow:"hidden", boxShadow:"0 24px 64px rgba(0,0,0,0.3)" }}>
-
-        <div style={{ padding:"14px 20px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-          <span style={{ fontSize:"14px", fontWeight:800, color:T.text }}>Add Team Member</span>
-          <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>✕</button>
-        </div>
-
-        {done ? (
-          <div style={{ padding:"40px 30px", textAlign:"center" }}>
-            <div style={{ fontSize:"40px", marginBottom:"12px" }}>✅</div>
-            <div style={{ fontSize:"16px", fontWeight:800, color:T.text, marginBottom:"6px" }}>Invitation Sent!</div>
-            <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"20px" }}>A login link has been sent to <strong>{email}</strong>. They can set their password and start using the system.</div>
-            <button onClick={onClose} style={{ background:T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"10px 26px", fontSize:"13px", fontWeight:700, cursor:"pointer" }}>Done</button>
-          </div>
-        ) : (
-          <div style={{ padding:"20px" }}>
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px", marginBottom:"14px" }}>
-              <div style={{ gridColumn:"1/-1" }}>
-                <SL c="Full Name" T={T} req/>
-                <Inp value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Nadia Islam" T={T}/>
-              </div>
-              <div>
-                <SL c="Email Address" T={T} req/>
-                <Inp value={email} onChange={e=>setEmail(e.target.value)} placeholder="nadia@gmail.com" T={T} type="email"/>
-              </div>
-              <div>
-                <SL c="Phone Number" T={T} req/>
-                <Inp value={phone} onChange={e=>setPhone(e.target.value)} placeholder="01XXXXXXXXX" T={T}/>
-              </div>
-            </div>
-
-            <div style={{ marginBottom:"16px" }}>
-              <SL c="Role" T={T} req/>
-              <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
-                {Object.entries(ROLES).map(([id, r]) => (
-                  <div key={id} onClick={() => setRole(id)}
-                    style={{ padding:"10px 13px", borderRadius:"9px", border:`2px solid ${role===id?r.color:T.border}`, background:role===id?r.color+"10":T.bg, cursor:"pointer", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
-                    <div>
-                      <div style={{ fontSize:"12px", fontWeight:700, color:role===id?r.color:T.text }}>{r.label}</div>
-                      <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"2px" }}>{r.permissions.slice(0,3).join(", ")}{r.permissions.length>3?" & more":""}</div>
-                    </div>
-                    <div style={{ width:"16px", height:"16px", borderRadius:"50%", border:`2px solid ${role===id?r.color:T.border}`, background:role===id?r.color:"transparent", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                      {role===id && <div style={{ width:"7px", height:"7px", borderRadius:"50%", background:"#fff" }}/>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ padding:"10px 13px", background:T.bg, borderRadius:"8px", marginBottom:"16px", fontSize:"11px", color:T.textMuted }}>
-              📧 An invitation email with login instructions will be sent to the address above.
-            </div>
-
-            <div style={{ display:"flex", gap:"8px" }}>
-              <button onClick={onClose} style={{ flex:1, background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
-              <button onClick={handle} disabled={!canSend}
-                style={{ flex:2, background:canSend?T.accent:T.bg, border:`1px solid ${canSend?T.accent:T.border}`, color:canSend?"#fff":T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"13px", fontWeight:700, cursor:canSend?"pointer":"not-allowed" }}>
-                ✉ Send Invitation
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── PERMISSIONS TABLE ─────────────────────────────────────────────────────
-function PermissionsTable({ T }) {
-  return (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", overflow:"hidden" }}>
-      <div style={{ padding:"12px 16px", borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Role Permissions</div>
-        <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"2px" }}>What each role can do in the system</div>
-      </div>
-      {/* Header */}
-      <div style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px 90px", padding:"9px 16px", background:T.tHead, borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ fontSize:"12px", fontWeight:700, color:T.textMuted, textTransform:"uppercase" }}>Permission</div>
-        {Object.values(ROLES).map(r => (
-          <div key={r.label} style={{ fontSize:"12px", fontWeight:700, color:r.color, textTransform:"uppercase", textAlign:"center" }}>{r.label}</div>
         ))}
       </div>
-      {ALL_PERMISSIONS.map(([perm, desc], i) => (
-        <div key={perm} style={{ display:"grid", gridTemplateColumns:"1fr 90px 90px 90px", padding:"9px 16px", borderBottom:i<ALL_PERMISSIONS.length-1?`1px solid ${T.border}`:"none", alignItems:"center" }}
-          onMouseEnter={e=>e.currentTarget.style.background=T.rowHover}
-          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+      {ALL_PERMISSIONS.map(([permission, description], idx) => (
+        <div
+          key={permission}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 90px 90px 90px",
+            padding: "9px 16px",
+            borderBottom: idx < ALL_PERMISSIONS.length - 1 ? `1px solid ${T.border}` : "none",
+          }}
+        >
           <div>
-            <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{perm}</div>
-            <div style={{ fontSize:"10px", color:T.textMuted }}>{desc}</div>
+            <div style={{ fontSize: "12px", fontWeight: 600, color: T.text }}>{permission}</div>
+            <div style={{ fontSize: "10px", color: T.textMuted }}>{description}</div>
           </div>
-          {Object.values(ROLES).map(r => (
-            <div key={r.label} style={{ textAlign:"center" }}>
-              {r.permissions.includes(perm)
-                ? <span style={{ fontSize:"14px", color:r.color }}>✓</span>
-                : <span style={{ fontSize:"14px", color:T.border }}>—</span>}
+          {(["admin", "agent", "viewer"] as RoleKey[]).map((role) => (
+            <div key={role} style={{ textAlign: "center", color: ROLES[role].permissions.includes(permission) ? ROLES[role].color : T.border }}>
+              {ROLES[role].permissions.includes(permission) ? "✓" : "-"}
             </div>
           ))}
         </div>
@@ -378,189 +296,504 @@ function PermissionsTable({ T }) {
   );
 }
 
-// ── MAIN ──────────────────────────────────────────────────────────────────
-export default function TeamPage() {
-  const [dark, setDark]         = useState(false);
-  const T = dark ? DARK : LIGHT;
-  const [nav, setNav]           = useState(10);
-  const [team, setTeam]         = useState(INIT_TEAM);
-  const [selected, setSelected] = useState<TeamMember | null>(null);
-  const [showInvite, setShowInvite] = useState(false);
-  const [tab, setTab]           = useState("members"); // members | permissions
+function MemberPanel({
+  member,
+  onClose,
+  onUpdate,
+  onRemove,
+  T,
+}: {
+  member: TeamMember;
+  onClose: () => void;
+  onUpdate: (member: TeamMember) => Promise<boolean>;
+  onRemove: (id: string) => Promise<boolean>;
+  T: Theme;
+}) {
+  const [draft, setDraft] = useState(member);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleUpdate = (updated) => {
-    setTeam(p => p.map(m => m.id === updated.id ? updated : m));
-    setSelected(updated);
+  useEffect(() => {
+    setDraft(member);
+  }, [member]);
+
+  const saveChanges = async () => {
+    setSaving(true);
+    setError(null);
+    const ok = await onUpdate(draft);
+    setSaving(false);
+    if (!ok) {
+      setError("Save failed. Please try again.");
+    }
   };
 
-  const handleRemove = (id) => {
-    setTeam(p => p.filter(m => m.id !== id));
-    setSelected(null);
+  const removeMember = async () => {
+    if (!window.confirm(`Remove ${member.name} from team?`)) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const ok = await onRemove(member.id);
+    setSaving(false);
+    if (ok) {
+      onClose();
+      return;
+    }
+    setError("Removal failed. Please try again.");
   };
-
-  const handleInvite = (newMember) => {
-    setTeam(p => [...p, newMember]);
-    setShowInvite(false);
-  };
-
-  const active   = team.filter(m => m.status==="active").length;
-  const inactive = team.filter(m => m.status==="inactive").length;
 
   return (
-    <div style={{ display:"flex", height:"100vh", background:T.bg, fontFamily:"system-ui,sans-serif", color:T.text, overflow:"hidden" }}>
+    <div style={{ width: "340px", borderLeft: `1px solid ${T.border}`, background: T.surface, padding: "14px", overflowY: "auto", flexShrink: 0 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <div style={{ fontSize: "13px", fontWeight: 800, color: T.text }}>Member Details</div>
+        <button onClick={onClose} style={{ border: `1px solid ${T.border}`, background: T.bg, color: T.textMuted, borderRadius: "7px", padding: "3px 8px", cursor: "pointer" }}>
+          Close
+        </button>
+      </div>
 
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+        <Avatar initials={member.avatar} color={member.avatarColor} size={40} />
+        <div>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: T.text }}>{member.name}</div>
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", marginTop: "2px" }}>
+            <RoleBadge role={member.role} />
+            <StatusDot status={member.status} />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: "10px" }}>
+        <LabeledInput label="Name" value={draft.name} onChange={(value) => setDraft((prev) => ({ ...prev, name: value }))} T={T} />
+        <LabeledInput label="Email" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} T={T} type="email" />
+        <LabeledInput label="Phone" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} T={T} />
+
+        <div>
+          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "5px", fontWeight: 700 }}>Role</div>
+          <select
+            value={draft.role}
+            onChange={(event) => setDraft((prev) => ({ ...prev, role: event.target.value as RoleKey }))}
+            style={{ width: "100%", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${T.border}`, background: T.bg, color: T.text, fontSize: "12px" }}
+          >
+            <option value="admin">Admin</option>
+            <option value="agent">Agent</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </div>
+
+        <div>
+          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "5px", fontWeight: 700 }}>Status</div>
+          <select
+            value={draft.status}
+            onChange={(event) => setDraft((prev) => ({ ...prev, status: event.target.value as MemberStatus }))}
+            style={{ width: "100%", padding: "9px 10px", borderRadius: "8px", border: `1px solid ${T.border}`, background: T.bg, color: T.text, fontSize: "12px" }}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      {error && <div style={{ marginTop: "10px", fontSize: "11px", color: "#DC2626" }}>{error}</div>}
+
+      <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
+        <button
+          onClick={saveChanges}
+          disabled={saving}
+          style={{ flex: 1, borderRadius: "8px", border: "none", padding: "9px 10px", background: saving ? "#94A3B8" : T.accent, color: "#fff", fontSize: "12px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+        <button
+          onClick={removeMember}
+          disabled={saving}
+          style={{ borderRadius: "8px", border: "none", padding: "9px 10px", background: "#DC2626", color: "#fff", fontSize: "12px", fontWeight: 700, cursor: saving ? "not-allowed" : "pointer" }}
+        >
+          Remove
+        </button>
+      </div>
+
+      <div style={{ marginTop: "14px", borderTop: `1px solid ${T.border}`, paddingTop: "10px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: T.textMuted, marginBottom: "6px" }}>Recent Activity</div>
+        {member.recentActivity.map((activity) => (
+          <div key={`${activity.action}-${activity.time}`} style={{ fontSize: "11px", color: T.textMid, marginBottom: "5px" }}>
+            • {activity.action} · {activity.time}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InviteModal({ onClose, onInvite, T }: { onClose: () => void; onInvite: (member: TeamMember) => Promise<boolean>; T: Theme }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [role, setRole] = useState<RoleKey>("agent");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canSubmit = name.trim().length > 1 && email.includes("@") && phone.trim().length > 5;
+
+  const submit = async () => {
+    if (!canSubmit) {
+      return;
+    }
+    const initials = name
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .map((chunk) => chunk[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+
+    const palette = ["#6366F1", "#059669", "#D97706", "#0D9488", "#A855F7"];
+    const newMember: TeamMember = {
+      id: `t-${Date.now()}`,
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
+      role,
+      status: "active",
+      joinedAt: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      lastActive: "Never",
+      ordersHandled: 0,
+      ordersThisMonth: 0,
+      revenueThisMonth: 0,
+      avgResponseTime: "-",
+      avatar: initials || "TM",
+      avatarColor: palette[Math.floor(Math.random() * palette.length)],
+      recentActivity: [{ action: "Account invited", time: "Just now" }],
+    };
+
+    setSaving(true);
+    setError(null);
+    const ok = await onInvite(newMember);
+    setSaving(false);
+    if (ok) {
+      onClose();
+      return;
+    }
+    setError("Invitation failed to save. Try again.");
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.45)" }} onClick={onClose} />
+      <div style={{ position: "relative", width: "460px", maxWidth: "95vw", background: T.surface, borderRadius: "12px", border: `1px solid ${T.border}`, overflow: "hidden", boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
+        <div style={{ padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: "13px", fontWeight: 800, color: T.text }}>Invite Team Member</div>
+          <button onClick={onClose} style={{ border: `1px solid ${T.border}`, borderRadius: "7px", background: T.bg, color: T.textMuted, padding: "3px 8px", cursor: "pointer" }}>
+            Close
+          </button>
+        </div>
+
+        <div style={{ padding: "14px 16px", display: "grid", gap: "10px" }}>
+          <LabeledInput label="Full Name" value={name} onChange={setName} T={T} />
+          <LabeledInput label="Email" value={email} onChange={setEmail} T={T} type="email" />
+          <LabeledInput label="Phone" value={phone} onChange={setPhone} T={T} />
+
+          <div>
+            <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "5px", fontWeight: 700 }}>Role</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "7px" }}>
+              {(["admin", "agent", "viewer"] as RoleKey[]).map((key) => (
+                <button
+                  key={key}
+                  onClick={() => setRole(key)}
+                  style={{
+                    border: `1px solid ${role === key ? ROLES[key].color : T.border}`,
+                    background: role === key ? `${ROLES[key].color}15` : T.bg,
+                    color: role === key ? ROLES[key].color : T.textMid,
+                    borderRadius: "8px",
+                    padding: "8px 8px",
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {ROLES[key].label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <div style={{ fontSize: "11px", color: "#DC2626" }}>{error}</div>}
+
+          <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            <button onClick={onClose} style={{ flex: 1, borderRadius: "8px", border: `1px solid ${T.border}`, background: T.bg, color: T.textMuted, padding: "9px 10px", cursor: "pointer", fontSize: "12px", fontWeight: 700 }}>
+              Cancel
+            </button>
+            <button
+              onClick={submit}
+              disabled={!canSubmit || saving}
+              style={{
+                flex: 2,
+                borderRadius: "8px",
+                border: "none",
+                background: canSubmit && !saving ? T.accent : "#94A3B8",
+                color: "#fff",
+                padding: "9px 10px",
+                cursor: canSubmit && !saving ? "pointer" : "not-allowed",
+                fontSize: "12px",
+                fontWeight: 700,
+              }}
+            >
+              {saving ? "Saving..." : "Send Invite"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function TeamPage() {
+  const [dark, setDark] = useState(false);
+  const T = dark ? DARK : LIGHT;
+  const [tab, setTab] = useState<"members" | "permissions">("members");
+  const [team, setTeam] = useState<TeamMember[]>([]);
+  const [selected, setSelected] = useState<TeamMember | null>(null);
+  const [showInvite, setShowInvite] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const session = loadSession();
+  const userName = session?.user?.name || "Admin";
+  const userRole = session?.user?.role || "admin";
+  const userAvatar = userName
+    .split(" ")
+    .map((chunk) => chunk[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  useEffect(() => {
+    let mounted = true;
+    const hydrate = async () => {
+      try {
+        const stored = await loadAppState<TeamMember[]>(TEAM_STATE_KEY, []);
+        if (!mounted) {
+          return;
+        }
+        setTeam(Array.isArray(stored) ? stored : []);
+      } catch {
+        if (mounted) {
+          setError("Could not load team state from database.");
+          setTeam([]);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+    void hydrate();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const commitTeam = async (next: TeamMember[]): Promise<boolean> => {
+    const previous = team;
+    setTeam(next);
+    setError(null);
+    try {
+      await saveAppState(TEAM_STATE_KEY, next);
+      return true;
+    } catch {
+      setTeam(previous);
+      setError("Database save failed. Your changes were not persisted.");
+      return false;
+    }
+  };
+
+  const handleUpdate = async (member: TeamMember) => {
+    const next = team.map((entry) => (entry.id === member.id ? member : entry));
+    const ok = await commitTeam(next);
+    if (ok) {
+      setSelected(member);
+    }
+    return ok;
+  };
+
+  const handleRemove = async (id: string) => {
+    const next = team.filter((entry) => entry.id !== id);
+    const ok = await commitTeam(next);
+    if (ok) {
+      setSelected(null);
+    }
+    return ok;
+  };
+
+  const handleInvite = async (member: TeamMember) => {
+    const next = [...team, member];
+    return commitTeam(next);
+  };
+
+  const totals = useMemo(() => {
+    const active = team.filter((member) => member.status === "active").length;
+    const inactive = team.filter((member) => member.status === "inactive").length;
+    const ordersMonth = team.reduce((sum, member) => sum + member.ordersThisMonth, 0);
+    const revenueMonth = team.reduce((sum, member) => sum + member.revenueThisMonth, 0);
+    return { active, inactive, ordersMonth, revenueMonth };
+  }, [team]);
+
+  const stats: Array<[string, ReactNode, string, string]> = [
+    ["Team Size", team.length, "#6366F1", "👥"],
+    ["Active", totals.active, "#059669", "🟢"],
+    ["Orders (Month)", totals.ordersMonth, "#0D9488", "📦"],
+    ["Revenue (Month)", `৳${totals.revenueMonth.toLocaleString()}`, "#D97706", "💰"],
+  ];
+
+  return (
+    <div style={{ display: "flex", height: "100vh", background: T.bg, color: T.text, fontFamily: "system-ui,sans-serif", overflow: "hidden" }}>
       <AdminSidebar
         T={T}
         dark={dark}
         setDark={setDark}
         navItems={NAV}
-        user={{ name: "Istiak", role: "Admin", avatar: "IS", color: "#6366F1" }}
-        onNavigateLabel={(_, i) => setNav(i)}
+        user={{ name: userName, role: userRole, avatar: userAvatar, color: "#6366F1" }}
+        onNavigateLabel={(label) => navigateByAdminNavLabel(label)}
+        onLogout={() => {
+          clearSession();
+          window.location.hash = "#/admin/login";
+        }}
       />
 
-      {/* Main */}
-      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
-
-        {/* Topbar */}
-        <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 20px", justifyContent:"space-between", flexShrink:0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <div style={{ height: "52px", background: T.sidebar, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 20px", flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize:"15px", fontWeight:800, color:T.text }}>Team Management</div>
-            <div style={{ fontSize:"11px", color:T.textMuted }}>{active} active · {inactive} inactive · {team.length} total</div>
+            <div style={{ fontSize: "15px", fontWeight: 800, color: T.text }}>Team Management</div>
+            <div style={{ fontSize: "11px", color: T.textMuted }}>
+              {totals.active} active · {totals.inactive} inactive · {team.length} total
+            </div>
           </div>
-          <button onClick={() => setShowInvite(true)}
-            style={{ background:T.accent, color:"#fff", border:"none", borderRadius:"8px", padding:"8px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:"7px" }}>
+          <button
+            onClick={() => setShowInvite(true)}
+            style={{ border: "none", borderRadius: "8px", background: T.accent, color: "#fff", fontSize: "12px", fontWeight: 700, padding: "8px 14px", cursor: "pointer" }}
+          >
             + Add Team Member
           </button>
         </div>
 
-        {/* Content + optional panel */}
-        <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+          <div style={{ flex: 1, padding: "16px 20px", overflowY: "auto" }}>
+            {error && <div style={{ marginBottom: "12px", background: "#FEE2E2", color: "#991B1B", border: "1px solid #FCA5A5", borderRadius: "9px", padding: "9px 12px", fontSize: "12px", fontWeight: 600 }}>{error}</div>}
 
-          <div style={{ flex:1, overflow:"auto", padding:"16px 20px" }}>
-
-            {/* Tabs */}
-            <div style={{ display:"flex", gap:"3px", background:T.surface, borderRadius:"9px", padding:"3px", border:`1px solid ${T.border}`, width:"fit-content", marginBottom:"16px" }}>
-              {[["members","👥 Members"],["permissions","🔐 Role Permissions"]].map(([id,label]) => (
-                <button key={id} onClick={() => setTab(id)}
-                  style={{ padding:"7px 18px", borderRadius:"7px", border:"none", cursor:"pointer", fontSize:"12px", fontWeight:700, background:tab===id?T.accent+"20":"transparent", color:tab===id?T.accent:T.textMuted }}>
-                  {label}
-                </button>
-              ))}
+            <div style={{ display: "flex", gap: "3px", border: `1px solid ${T.border}`, borderRadius: "9px", background: T.surface, padding: "3px", width: "fit-content", marginBottom: "16px" }}>
+              <button
+                onClick={() => setTab("members")}
+                style={{ border: "none", borderRadius: "7px", background: tab === "members" ? `${T.accent}20` : "transparent", color: tab === "members" ? T.accent : T.textMuted, fontSize: "12px", fontWeight: 700, padding: "7px 15px", cursor: "pointer" }}
+              >
+                Members
+              </button>
+              <button
+                onClick={() => setTab("permissions")}
+                style={{ border: "none", borderRadius: "7px", background: tab === "permissions" ? `${T.accent}20` : "transparent", color: tab === "permissions" ? T.accent : T.textMuted, fontSize: "12px", fontWeight: 700, padding: "7px 15px", cursor: "pointer" }}
+              >
+                Role Permissions
+              </button>
             </div>
 
-            {/* Members tab */}
+            {tab === "permissions" && <PermissionsTable T={T} />}
+
             {tab === "members" && (
               <>
-                {/* Stats */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"10px", marginBottom:"16px" }}>
-                  {([
-                    ["Team Size",      team.length,      "#6366F1","👥"],
-                    ["Active",         active,            "#059669","🟢"],
-                    ["Orders (Month)", team.reduce((a,b)=>a+b.ordersThisMonth,0), "#0D9488","📦"],
-                    ["Revenue (Month)","৳"+team.reduce((a,b)=>a+b.revenueThisMonth,0).toLocaleString(), "#D97706","💰"],
-                  ] as Array<[string, ReactNode, string, string]>).map(([label,val,color,icon]) => (
-                    <div key={label} style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", padding:"14px 16px" }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"8px" }}>
-                        <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</div>
-                        <span style={{ fontSize:"16px" }}>{icon}</span>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px", marginBottom: "14px" }}>
+                  {stats.map(([label, value, color, icon]) => (
+                    <div key={label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "13px 14px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <div style={{ fontSize: "10px", color: T.textMuted, textTransform: "uppercase", fontWeight: 700 }}>{label}</div>
+                        <span>{icon}</span>
                       </div>
-                      <div style={{ fontSize:"22px", fontWeight:800, color }}>{val}</div>
+                      <div style={{ fontSize: "20px", fontWeight: 800, color: color as string }}>{value}</div>
                     </div>
                   ))}
                 </div>
 
-                {/* Member cards */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))", gap:"12px" }}>
-                  {team.map(member => {
-                    const r = ROLES[member.role];
-                    const isSelected = selected?.id === member.id;
-                    return (
-                      <div key={member.id} onClick={() => setSelected(isSelected ? null : member)}
-                        style={{ background:T.surface, border:`1.5px solid ${isSelected?r.color:T.border}`, borderRadius:"12px", padding:"16px", cursor:"pointer", transition:"border-color 0.15s" }}
-                        onMouseEnter={e=>{ if(!isSelected) e.currentTarget.style.borderColor=r.color+"60"; }}
-                        onMouseLeave={e=>{ if(!isSelected) e.currentTarget.style.borderColor=T.border; }}>
-
-                        {/* Top row */}
-                        <div style={{ display:"flex", alignItems:"flex-start", gap:"12px", marginBottom:"12px" }}>
-                          <div style={{ position:"relative" }}>
-                            <Avatar initials={member.avatar} color={member.avatarColor} size={44}/>
-                            <div style={{ position:"absolute", bottom:"1px", right:"1px", width:"11px", height:"11px", borderRadius:"50%", background:member.status==="active"?"#059669":"#64748B", border:`2px solid ${T.surface}` }}/>
+                {loading ? (
+                  <div style={{ fontSize: "12px", color: T.textMuted }}>Loading team from database...</div>
+                ) : (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "12px" }}>
+                    {team.map((member) => {
+                      const roleColor = ROLES[member.role].color;
+                      const selectedMember = selected?.id === member.id;
+                      return (
+                        <div
+                          key={member.id}
+                          onClick={() => setSelected(selectedMember ? null : member)}
+                          style={{
+                            background: T.surface,
+                            border: `1.5px solid ${selectedMember ? roleColor : T.border}`,
+                            borderRadius: "12px",
+                            padding: "14px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", marginBottom: "10px" }}>
+                            <Avatar initials={member.avatar} color={member.avatarColor} size={42} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "14px", fontWeight: 800, color: T.text }}>{member.name}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                                <RoleBadge role={member.role} />
+                                <StatusDot status={member.status} />
+                              </div>
+                            </div>
                           </div>
-                          <div style={{ flex:1 }}>
-                            <div style={{ fontSize:"14px", fontWeight:800, color:T.text, marginBottom:"3px" }}>{member.name}</div>
-                            <div style={{ display:"flex", gap:"6px", alignItems:"center" }}>
-                              <RoleBadge role={member.role} T={T}/>
-                              <StatusDot status={member.status}/>
+
+                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "3px" }}>📧 {member.email}</div>
+                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "10px" }}>📞 {member.phone}</div>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
+                            <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
+                              <div style={{ fontSize: "10px", color: T.textMuted }}>Orders</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: T.accent }}>{member.ordersThisMonth}</div>
+                            </div>
+                            <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
+                              <div style={{ fontSize: "10px", color: T.textMuted }}>Revenue</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#059669" }}>৳{Math.round(member.revenueThisMonth / 1000)}k</div>
+                            </div>
+                            <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
+                              <div style={{ fontSize: "10px", color: T.textMuted }}>Avg Resp</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#D97706" }}>{member.avgResponseTime}</div>
                             </div>
                           </div>
                         </div>
+                      );
+                    })}
 
-                        {/* Contact */}
-                        <div style={{ marginBottom:"12px" }}>
-                          <div style={{ fontSize:"11px", color:T.textMuted, marginBottom:"2px" }}>📧 {member.email}</div>
-                          <div style={{ fontSize:"11px", color:T.textMuted }}>📞 {member.phone}</div>
-                        </div>
-
-                        {/* Stats mini */}
-                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"6px", marginBottom:"12px" }}>
-                          {[["Orders",member.ordersThisMonth+" mo",T.accent],["Revenue","৳"+(member.revenueThisMonth/1000).toFixed(0)+"k","#059669"],["Resp.",member.avgResponseTime,"#D97706"]].map(([l,v,c])=>(
-                            <div key={l} style={{ background:T.bg, borderRadius:"7px", padding:"7px 9px" }}>
-                              <div style={{ fontSize:"10px", color:T.textMuted, textTransform:"uppercase", letterSpacing:"0.3px", marginBottom:"2px" }}>{l}</div>
-                              <div style={{ fontSize:"13px", fontWeight:800, color:c }}>{v}</div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Last active */}
-                        <div style={{ fontSize:"10px", color:T.textMuted }}>
-                          🕐 Last active: <span style={{ color:T.textMid, fontWeight:600 }}>{member.lastActive}</span>
-                        </div>
+                    <div
+                      onClick={() => setShowInvite(true)}
+                      style={{
+                        background: T.surface,
+                        border: `2px dashed ${T.border}`,
+                        borderRadius: "12px",
+                        minHeight: "165px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "column",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ width: "42px", height: "42px", borderRadius: "999px", background: `${T.accent}20`, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "8px", fontSize: "22px", color: T.accent }}>
+                        +
                       </div>
-                    );
-                  })}
-
-                  {/* Add member card */}
-                  <div onClick={() => setShowInvite(true)}
-                    style={{ background:T.surface, border:`2px dashed ${T.border}`, borderRadius:"12px", padding:"16px", cursor:"pointer", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"180px", transition:"all 0.15s" }}
-                    onMouseEnter={e=>{e.currentTarget.style.borderColor=T.accent;e.currentTarget.style.background=T.accent+"06";}}
-                    onMouseLeave={e=>{e.currentTarget.style.borderColor=T.border;e.currentTarget.style.background=T.surface;}}>
-                    <div style={{ width:"44px", height:"44px", borderRadius:"50%", background:T.accent+"15", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", marginBottom:"10px" }}>+</div>
-                    <div style={{ fontSize:"13px", fontWeight:700, color:T.accent, marginBottom:"4px" }}>Add Team Member</div>
-                    <div style={{ fontSize:"11px", color:T.textMuted, textAlign:"center" }}>Invite a new agent or admin</div>
+                      <div style={{ fontSize: "12px", color: T.accent, fontWeight: 700 }}>Invite Team Member</div>
+                    </div>
                   </div>
-                </div>
+                )}
               </>
             )}
-
-            {/* Permissions tab */}
-            {tab === "permissions" && <PermissionsTable T={T}/>}
-
           </div>
 
-          {/* Member detail panel */}
-          {selected && tab==="members" && (
-            <MemberPanel
-              key={selected.id}
-              member={team.find(m=>m.id===selected.id)||selected}
-              onClose={() => setSelected(null)}
-              onUpdate={handleUpdate}
-              onRemove={handleRemove}
-              T={T}
-            />
+          {selected && tab === "members" && (
+            <MemberPanel member={selected} onClose={() => setSelected(null)} onUpdate={handleUpdate} onRemove={handleRemove} T={T} />
           )}
         </div>
       </div>
 
-      {showInvite && <InviteModal onInvite={handleInvite} onClose={() => setShowInvite(false)} T={T}/>}
+      {showInvite && <InviteModal onClose={() => setShowInvite(false)} onInvite={handleInvite} T={T} />}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-

@@ -3,6 +3,13 @@
 
 create extension if not exists "pgcrypto";
 
+-- ===== Migration tracking =====
+create table if not exists schema_migrations (
+  version varchar(128) primary key,
+  description text,
+  applied_at timestamptz not null default now()
+);
+
 -- ===== Enums =====
 create type user_role as enum ('admin', 'agent', 'product_uploader', 'viewer');
 create type order_status as enum (
@@ -54,6 +61,13 @@ create table user_sessions (
 
 create index idx_user_sessions_user on user_sessions(user_id);
 create index idx_user_sessions_expires on user_sessions(expires_at);
+
+-- ===== Generic app state =====
+create table app_state (
+  state_key text primary key,
+  state_value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
 
 -- ===== Catalog =====
 create table categories (
