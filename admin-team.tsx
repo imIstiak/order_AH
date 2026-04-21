@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+﻿import { useEffect, useMemo, useState, type ReactNode } from "react";
 import AdminSidebar from "./core/admin-sidebar";
 import { clearSession, loadSession } from "./core/auth-session";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
@@ -110,66 +110,6 @@ const ALL_PERMISSIONS: Array<[string, string]> = [
   ["View products", "View product catalog only"],
   ["View dashboard", "Read-only dashboard access"],
   ["View reports", "Read-only reporting access"],
-];
-
-const INIT_TEAM: TeamMember[] = [
-  {
-    id: "t-admin-1",
-    name: "Istiak Rahman",
-    email: "istiak@shopadmin.test",
-    phone: "01700000000",
-    role: "admin",
-    status: "active",
-    joinedAt: "03 Mar 2025",
-    lastActive: "Today, 10:41 AM",
-    ordersHandled: 132,
-    ordersThisMonth: 41,
-    revenueThisMonth: 467200,
-    avgResponseTime: "4m",
-    avatar: "IR",
-    avatarColor: "#6366F1",
-    recentActivity: [
-      { action: "Updated order workflow", time: "Today, 09:50 AM" },
-      { action: "Approved coupon edits", time: "Yesterday" },
-    ],
-  },
-  {
-    id: "t-agent-1",
-    name: "Nadia Islam",
-    email: "nadia@shopadmin.test",
-    phone: "01800000000",
-    role: "agent",
-    status: "active",
-    joinedAt: "19 Feb 2025",
-    lastActive: "Today, 09:22 AM",
-    ordersHandled: 98,
-    ordersThisMonth: 36,
-    revenueThisMonth: 313600,
-    avgResponseTime: "7m",
-    avatar: "NI",
-    avatarColor: "#059669",
-    recentActivity: [
-      { action: "Resolved pending order", time: "Today, 09:10 AM" },
-      { action: "Called customer", time: "Yesterday" },
-    ],
-  },
-  {
-    id: "t-viewer-1",
-    name: "Fahim Hasan",
-    email: "fahim@shopadmin.test",
-    phone: "01900000000",
-    role: "viewer",
-    status: "inactive",
-    joinedAt: "08 Jan 2025",
-    lastActive: "10 days ago",
-    ordersHandled: 0,
-    ordersThisMonth: 0,
-    revenueThisMonth: 0,
-    avgResponseTime: "-",
-    avatar: "FH",
-    avatarColor: "#D97706",
-    recentActivity: [{ action: "Account deactivated", time: "10 days ago" }],
-  },
 ];
 
 const TEAM_STATE_KEY = "team.members";
@@ -287,7 +227,7 @@ function PermissionsTable({ T }: { T: Theme }) {
           </div>
           {(["admin", "agent", "viewer"] as RoleKey[]).map((role) => (
             <div key={role} style={{ textAlign: "center", color: ROLES[role].permissions.includes(permission) ? ROLES[role].color : T.border }}>
-              {ROLES[role].permissions.includes(permission) ? "✓" : "-"}
+              {ROLES[role].permissions.includes(permission) ? "âœ“" : "-"}
             </div>
           ))}
         </div>
@@ -416,7 +356,7 @@ function MemberPanel({
         <div style={{ fontSize: "11px", fontWeight: 700, color: T.textMuted, marginBottom: "6px" }}>Recent Activity</div>
         {member.recentActivity.map((activity) => (
           <div key={`${activity.action}-${activity.time}`} style={{ fontSize: "11px", color: T.textMid, marginBottom: "5px" }}>
-            • {activity.action} · {activity.time}
+            â€¢ {activity.action} Â· {activity.time}
           </div>
         ))}
       </div>
@@ -639,10 +579,10 @@ export default function TeamPage() {
   }, [team]);
 
   const stats: Array<[string, ReactNode, string, string]> = [
-    ["Team Size", team.length, "#6366F1", "👥"],
-    ["Active", totals.active, "#059669", "🟢"],
-    ["Orders (Month)", totals.ordersMonth, "#0D9488", "📦"],
-    ["Revenue (Month)", `৳${totals.revenueMonth.toLocaleString()}`, "#D97706", "💰"],
+    ["Team Size", team.length, "#6366F1", "ðŸ‘¥"],
+    ["Active", totals.active, "#059669", "ðŸŸ¢"],
+    ["Orders (Month)", totals.ordersMonth, "#0D9488", "ðŸ“¦"],
+    ["Revenue (Month)", `à§³${totals.revenueMonth.toLocaleString()}`, "#D97706", "ðŸ’°"],
   ];
 
   return (
@@ -665,7 +605,7 @@ export default function TeamPage() {
           <div>
             <div style={{ fontSize: "15px", fontWeight: 800, color: T.text }}>Team Management</div>
             <div style={{ fontSize: "11px", color: T.textMuted }}>
-              {totals.active} active · {totals.inactive} inactive · {team.length} total
+              {totals.active} active Â· {totals.inactive} inactive Â· {team.length} total
             </div>
           </div>
           <button
@@ -741,8 +681,8 @@ export default function TeamPage() {
                             </div>
                           </div>
 
-                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "3px" }}>📧 {member.email}</div>
-                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "10px" }}>📞 {member.phone}</div>
+                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "3px" }}>ðŸ“§ {member.email}</div>
+                          <div style={{ fontSize: "11px", color: T.textMuted, marginBottom: "10px" }}>ðŸ“ž {member.phone}</div>
 
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px" }}>
                             <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
@@ -751,7 +691,7 @@ export default function TeamPage() {
                             </div>
                             <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
                               <div style={{ fontSize: "10px", color: T.textMuted }}>Revenue</div>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#059669" }}>৳{Math.round(member.revenueThisMonth / 1000)}k</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: "#059669" }}>à§³{Math.round(member.revenueThisMonth / 1000)}k</div>
                             </div>
                             <div style={{ background: T.bg, borderRadius: "7px", padding: "7px" }}>
                               <div style={{ fontSize: "10px", color: T.textMuted }}>Avg Resp</div>
@@ -797,3 +737,4 @@ export default function TeamPage() {
     </div>
   );
 }
+

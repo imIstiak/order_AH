@@ -2,3 +2,13 @@
 node_modules/
 dist/
 build/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!.env*.example
+!.env.sample
+
+# Local Vercel pull artifacts
+.vercel/.env*

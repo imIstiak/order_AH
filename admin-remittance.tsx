@@ -14,42 +14,41 @@ const MATCH_TABLE_COLS = "30px minmax(130px,1fr) minmax(160px,1.4fr) minmax(90px
 const PENDING_TABLE_COLS = "minmax(150px,1.3fr) minmax(220px,1.9fr) minmax(110px,0.95fr) minmax(100px,0.9fr) minmax(90px,0.8fr) minmax(80px,0.72fr) minmax(110px,0.95fr) minmax(90px,0.75fr)";
 const SETTLED_TABLE_COLS = "minmax(140px,1.3fr) minmax(220px,2fr) minmax(90px,0.8fr) minmax(80px,0.7fr) minmax(70px,0.6fr) minmax(90px,0.8fr)";
 
-// ── MOCK: Orders with Pathao consignment IDs ──────────────────────────────
-// In real system these are generated when order is sent to Pathao via API
-// DL = delivery, RL = return
-const PENDING_ORDERS = [
-  { id:"o1",  num:"#1001", consId:"DL140426NSE58N", customer:"Takia",          phone:"01859505075", area:"Dhaka",       deliveredAt:"14 Apr 2026", codCollected:1530, deliveryCharge:70,  type:"delivery", daysAgo:3, overdue:true  },
-  { id:"o2",  num:"#1002", consId:"DL120426L99NUJ", customer:"Maliha Mimty",   phone:"01741930222", area:"Dinajpur",    deliveredAt:"12 Apr 2026", codCollected:1500, deliveryCharge:130, type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o3",  num:"#1003", consId:"DL120426QZ2NK5", customer:"Tasnin",         phone:"01321766877", area:"Savar",       deliveredAt:"12 Apr 2026", codCollected:1430, deliveryCharge:100, type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o4",  num:"#1004", consId:"DL140426VLTPB6", customer:"Rabita Faiza",   phone:"01798111565", area:"Mymensingh",  deliveredAt:"14 Apr 2026", codCollected:2350, deliveryCharge:130, type:"delivery", daysAgo:3, overdue:true  },
-  { id:"o5",  num:"#1005", consId:"DL140426E6JVGU", customer:"Sumaiya Oithy",  phone:"01819425987", area:"Dhaka",       deliveredAt:"14 Apr 2026", codCollected:1430, deliveryCharge:70,  type:"delivery", daysAgo:3, overdue:true  },
-  { id:"o6",  num:"#1006", consId:"DL120426DXRMZZ", customer:"Monia",          phone:"01970135654", area:"Dhaka",       deliveredAt:"12 Apr 2026", codCollected:1530, deliveryCharge:70,  type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o7",  num:"#1007", consId:"DL120426PDGJ67", customer:"Tanjina Jui",    phone:"01754656976", area:"Mymensingh",  deliveredAt:"12 Apr 2026", codCollected:4250, deliveryCharge:130, type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o8",  num:"#1008", consId:"DL140426FY9A69", customer:"Lamiya Lamisha",  phone:"01715545545", area:"Shahmokdum", deliveredAt:"14 Apr 2026", codCollected:1600, deliveryCharge:110, type:"delivery", daysAgo:3, overdue:false },
-  { id:"o9",  num:"#1009", consId:"DL140426VEJBRD", customer:"Saiba",           phone:"01612833079", area:"Tangail",    deliveredAt:"14 Apr 2026", codCollected:1600, deliveryCharge:110, type:"delivery", daysAgo:3, overdue:false },
-  { id:"o10", num:"#1010", consId:"DL120426KLZ9J8", customer:"Tasfiah Sabah",   phone:"01970956667", area:"Dhaka",      deliveredAt:"12 Apr 2026", codCollected:1360, deliveryCharge:70,  type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o11", num:"#1011", consId:"DL120426RSDYXL", customer:"Farhana",         phone:"01792229588", area:"Moulvibazar",deliveredAt:"12 Apr 2026", codCollected:3800, deliveryCharge:170, type:"delivery", daysAgo:5, overdue:true  },
-  { id:"o12", num:"#1012", consId:"DL120426ZWH8PE", customer:"Tasmia Tabassum", phone:"01932222611", area:"Dhaka",      deliveredAt:"12 Apr 2026", codCollected:1530, deliveryCharge:70,  type:"delivery", daysAgo:5, overdue:true  },
-  // A return order - Pathao charges return fee, no COD collected
-  { id:"o13", num:"#1013", consId:"RL120426JUPS9B", customer:"Little Things",   phone:"01755070168", area:"Dhaka",      deliveredAt:"12 Apr 2026", codCollected:0,    deliveryCharge:40,  type:"return",   daysAgo:5, overdue:true  },
-];
+type RemittanceOrder = {
+  id?: string;
+  num: string;
+  consId: string;
+  customer: string;
+  phone: string;
+  area: string;
+  deliveredAt: string;
+  codCollected: number;
+  deliveryCharge: number;
+  type: "delivery" | "return";
+  daysAgo?: number;
+  overdue?: boolean;
+};
 
-const INIT_SETTLED = [
-  {
-    id:"s1", invoiceId:"PATHAO-INV-2025-041", settledAt:"14 Apr 2026",
-    method:"bKash", txId:"BK20260414882211", fileName:"PATHAO-INV-041.pdf",
-    orders:[
-      { num:"#0975", consId:"DL090426STP2R4", customer:"Zia Chowdhury",   phone:"01815020914", area:"Dhaka",      deliveredAt:"9 Apr",  codCollected:1130, deliveryCharge:110, type:"delivery" },
-      { num:"#0963", consId:"DL090426GM3J2V", customer:"Tofayel",         phone:"01705219211", area:"Dhaka",      deliveredAt:"9 Apr",  codCollected:1130, deliveryCharge:70,  type:"delivery" },
-      { num:"#0944", consId:"DL0904267E8ELQ", customer:"Afroja Momy",     phone:"01783755519", area:"Sylhet",     deliveredAt:"9 Apr",  codCollected:0,    deliveryCharge:170, type:"delivery" },
-      { num:"#0930", consId:"RL0904267E8ELQ", customer:"Little Things",   phone:"01755070168", area:"Dhaka",      deliveredAt:"9 Apr",  codCollected:0,    deliveryCharge:75,  type:"return"   },
-    ],
-    grossCOD:2260, totalDelivery:425, totalCodFee:11.3, netPaidOut:1823.7,
-  },
-];
+type PendingOrder = RemittanceOrder & {
+  id: string;
+  daysAgo: number;
+  overdue: boolean;
+};
 
-type PendingOrder = (typeof PENDING_ORDERS)[number];
-type SettledBatch = (typeof INIT_SETTLED)[number];
+type SettledBatch = {
+  id: string;
+  invoiceId: string;
+  invoiceDate?: string;
+  settledAt: string;
+  method: string;
+  txId: string;
+  fileName: string;
+  orders: RemittanceOrder[];
+  grossCOD: number;
+  totalDelivery: number;
+  totalCodFee: number;
+  netPaidOut: number;
+};
 
 // Calc per order
 const calcOrder = (o) => {

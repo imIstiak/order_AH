@@ -19,6 +19,17 @@
 
 Runtime API routes fail fast if `APP_DATABASE_URL` is missing. The migration runner fails fast if `MIGRATION_DATABASE_URL` is missing.
 
+## Security Emergency: Secret Leak Response
+If GitGuardian detected leaked credentials, do this immediately:
+1. Rotate all leaked credentials now (Neon DB users, R2 access keys, MiMSMS API key, Vercel tokens).
+2. Revoke old credentials after confirming new ones work.
+3. Remove secret files from git tracking and keep only `.env.example` in repository.
+4. Reconfigure secrets in platform settings (Vercel/Netlify/GitHub Actions), not in files.
+5. Redeploy after rotation.
+6. Rewrite git history to fully purge leaked secrets from old commits.
+
+Important: deleting a secret from the latest commit is not enough. Assume exposed secrets are compromised until rotated.
+
 ### Example `.env` setup
 ```env
 # App runtime credentials (data read/write only)
@@ -30,6 +41,12 @@ MIGRATION_DATABASE_URL=postgres://migration_user:MIGRATION_PASSWORD@db-host:5432
 # Optional local override
 SKIP_DB_MIGRATIONS=false
 ```
+
+### Safe env workflow
+1. Keep `.env.example` in git with placeholders only.
+2. Put real values in `.env.local` (ignored by git) for local development.
+3. Run `npm run secrets:check` before pushing.
+4. Store production values only in deployment secret managers.
 
 ## Deploy to Vercel
 1. Push this folder to GitHub

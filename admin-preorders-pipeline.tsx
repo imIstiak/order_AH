@@ -20,25 +20,27 @@ const STAGES = [
   { id:"delayed",         label:"Delayed",            color:"#DC2626", icon:"⚠️", desc:"Shipment delayed — customer notified" },
 ];
 
-const INIT_ORDERS = [
-  { id:"o1",  num:"#1002", customer:"Rahela Khanam",    phone:"01722222222", area:"Dhaka", product:"High Ankle Converse", variant:"38 - White", qty:1, price:3200, advance:800,  stage:"ordered",      placedAt:"14 Apr",  eta:"14 May", supplier:"Ali Express Store #4421", supplierNote:"Order placed. Expected ship date: Apr 22.", notified:true  },
-  { id:"o2",  num:"#1004", customer:"Sabrina Islam",    phone:"01633333333", area:"Sylhet",product:"Silver Bracelet",      variant:"Free-Silver",qty:1, price:1800, advance:500,  stage:"delayed",      placedAt:"10 Apr",  eta:"20 May", supplier:"Ali Express Store #2200", supplierNote:"Delayed due to customs. New ETA: May 20.",  notified:true  },
-  { id:"o3",  num:"#1010", customer:"Kohinoor Begum",   phone:"01677777777", area:"Gazipur",product:"Quilted Shoulder Bag",variant:"M-Pink",     qty:2, price:7000, advance:2000, stage:"in_transit",   placedAt:"12 Apr",  eta:"10 May", supplier:"1688 Store #881",        supplierNote:"Shipped via sea freight. Tracking: CN-882211.", notified:false },
-  { id:"o4",  num:"#1012", customer:"Nasreen Akter",    phone:"01499999999", area:"Dhaka", product:"Platform Sneakers",    variant:"37 - Black", qty:1, price:3800, advance:800,  stage:"advance_paid", placedAt:"14 Apr",  eta:"15 May", supplier:"",                       supplierNote:"",                                              notified:false },
-  { id:"o5",  num:"#1015", customer:"Ruma Islam",       phone:"01500000000", area:"Dhaka", product:"High Ankle Converse",  variant:"37 - White", qty:1, price:3200, advance:800,  stage:"advance_paid", placedAt:"17 Apr",  eta:"17 May", supplier:"",                       supplierNote:"",                                              notified:false },
-  { id:"o6",  num:"#1008", customer:"Dilruba Hossain",  phone:"01488888888", area:"Dhaka", product:"Canvas Backpack",      variant:"L - Navy",   qty:1, price:2400, advance:600,  stage:"arrived_bd",   placedAt:"5 Apr",   eta:"20 Apr", supplier:"Ali Express Store #4421", supplierNote:"Arrived warehouse Apr 19.",                      notified:true  },
-  { id:"o7",  num:"#1009", customer:"Parvin Sultana",   phone:"01566666666", area:"Chittagong",product:"Ankle Strap Heels",variant:"38 - Nude",  qty:1, price:2800, advance:700,  stage:"packing",      placedAt:"4 Apr",   eta:"19 Apr", supplier:"1688 Store #331",        supplierNote:"Packed and ready.",                              notified:true  },
-  { id:"o8",  num:"#1003", customer:"Mithila Rahman",   phone:"01544444444", area:"Dhaka", product:"Embroidered Clutch",   variant:"Free - Red", qty:1, price:2200, advance:600,  stage:"shipped",      placedAt:"1 Apr",   eta:"18 Apr", supplier:"Ali Express Store #2200", supplierNote:"Shipped via Pathao.",                            notified:true  },
-  { id:"o9",  num:"#0998", customer:"Fatima Akter",     phone:"01711111111", area:"Dhaka", product:"Woven Raffia Bag",     variant:"M - Natural",qty:2, price:3800, advance:1000, stage:"in_transit",   placedAt:"10 Apr",  eta:"8 May",  supplier:"1688 Store #881",        supplierNote:"In transit via air freight.",                    notified:true  },
-  { id:"o10", num:"#0995", customer:"Rahela Khanam",    phone:"01722222222", area:"Dhaka", product:"Silver Bracelet",      variant:"Free - Gold",qty:1, price:1800, advance:500,  stage:"ordered",      placedAt:"8 Apr",   eta:"8 May",  supplier:"Ali Express Store #2200", supplierNote:"",                                              notified:false },
-  { id:"o11", num:"#0991", customer:"Sabrina Islam",    phone:"01633333333", area:"Sylhet",product:"Gold Chain Necklace",  variant:"Free - Gold",qty:1, price:2100, advance:500,  stage:"ordered",      placedAt:"6 Apr",   eta:"6 May",  supplier:"Ali Express Store #4421", supplierNote:"Order confirmed by supplier.",                   notified:true  },
-  { id:"o12", num:"#0985", customer:"Kohinoor Begum",   phone:"01677777777", area:"Gazipur",product:"Platform Sneakers",  variant:"38 - Black", qty:1, price:3800, advance:1000, stage:"arrived_bd",   placedAt:"2 Apr",   eta:"16 Apr", supplier:"1688 Store #331",        supplierNote:"Arrived Apr 16, ready to pack.",                 notified:false },
-];
+type PreOrderRecord = {
+  id: string;
+  num: string;
+  customer: string;
+  phone: string;
+  area: string;
+  product: string;
+  variant: string;
+  qty: number;
+  price: number;
+  advance: number;
+  stage: string;
+  placedAt: string;
+  eta: string;
+  supplier: string;
+  supplierNote: string;
+  notified: boolean;
+};
 
 const PROD_EMOJI = { "High Ankle Converse":"👟","Silver Bracelet":"📿","Quilted Shoulder Bag":"👜","Platform Sneakers":"👠","Canvas Backpack":"🎒","Ankle Strap Heels":"🥿","Embroidered Clutch":"👝","Woven Raffia Bag":"🧺","Leather Tote Bag":"🛍️","Gold Chain Necklace":"💛" };
 const PROD_BG    = { "High Ankle Converse":"#1E40AF","Silver Bracelet":"#6B21A8","Quilted Shoulder Bag":"#9D174D","Platform Sneakers":"#7C3AED","Canvas Backpack":"#065F46","Ankle Strap Heels":"#B45309","Embroidered Clutch":"#B91C1C","Woven Raffia Bag":"#78350F","Leather Tote Bag":"#92400E","Gold Chain Necklace":"#92400E" };
-
-type PreOrderRecord = (typeof INIT_ORDERS)[number];
 
 // ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 

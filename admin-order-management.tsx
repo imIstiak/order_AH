@@ -9,39 +9,19 @@ import AdminSidebar from "./core/admin-sidebar";
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", rowHover:"rgba(255,255,255,0.03)", rowSel:"rgba(99,102,241,0.08)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", rowHover:"rgba(0,0,0,0.025)", rowSel:"rgba(99,102,241,0.06)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)" };
 
-// ── CATALOG ─────────────────────────────────────────────────────────────────
-const CATALOG = [
-  { id:"p1", name:"Leather Tote Bag",      price:2500, sizes:["S","M","L"],             colors:["Black","Brown","Beige"], img:"🛍️", bg:"#92400E" },
-  { id:"p2", name:"High Ankle Converse",   price:3200, sizes:["36","37","38","39","40"], colors:["White","Black"],         img:"👟", bg:"#1E40AF" },
-  { id:"p3", name:"Canvas Backpack",       price:2400, sizes:["M","L"],                 colors:["Olive","Grey","Navy"],    img:"🎒", bg:"#065F46" },
-  { id:"p4", name:"Silver Bracelet",       price:1800, sizes:["Free"],                  colors:["Silver","Gold"],          img:"📿", bg:"#6B21A8" },
-  { id:"p5", name:"Quilted Shoulder Bag",  price:3500, sizes:["S","M"],                 colors:["Beige","Pink","Black"],   img:"👜", bg:"#9D174D" },
-  { id:"p6", name:"Platform Sneakers",     price:3800, sizes:["36","37","38","39","40"], colors:["White","Black"],          img:"👠", bg:"#7C3AED" },
-  { id:"p7", name:"Embroidered Clutch",    price:2200, sizes:["Free"],                  colors:["Red","Blue","Gold"],      img:"👝", bg:"#B91C1C" },
-  { id:"p8", name:"Ankle Strap Heels",     price:2800, sizes:["36","37","38","39"],     colors:["Nude","Black"],           img:"🥿", bg:"#B45309" },
-];
+const PRODUCT_ICONS = ["🛍️", "👟", "🎒", "📿", "👜", "👠", "👝", "🥿", "📦", "💼"];
+const PRODUCT_BGS = ["#334155", "#1E40AF", "#065F46", "#6B21A8", "#9D174D", "#7C3AED", "#B91C1C", "#B45309", "#0D9488", "#92400E"];
 
-const getProd = (id) => CATALOG.find(p => p.id === id) || null;
-
-// ── ORDERS ──────────────────────────────────────────────────────────────────
-const INIT = [
-  { id:"O1",  num:"#1001", type:"stock",    status:"Confirmed",        source:"facebook",  customer:"Fatima Akter",   phone:"01712345678", area:"Dhaka / Dhanmondi",    advance:0,    discount:0,   discType:"flat", pay:"COD",          payStatus:"pending",   fraud:"low",    agent:"Rafi", placedBy:"agent",    date:"2025-04-15", consId:null,              issue:null, customerNote:"",                    internalNote:"Prefers afternoon delivery",   items:[{pid:"p1",name:"Leather Tote Bag",     size:"M",    color:"Black",  qty:1,price:2500}] },
-  { id:"O2",  num:"#1002", type:"preorder", status:"Advance Paid",     source:"instagram", customer:"Rahela Khanam",  phone:"01812345678", area:"Dhaka / Uttara",        advance:800,  discount:0,   discType:"flat", pay:"bKash API",    payStatus:"verified",  fraud:"low",    agent:"Mitu", placedBy:"agent",    date:"2025-04-14", consId:null,              issue:null, customerNote:"ETA May 14.",          internalNote:"",                             items:[{pid:"p2",name:"High Ankle Converse",  size:"38",   color:"White",  qty:1,price:3200}] },
-  { id:"O3",  num:"#1003", type:"stock",    status:"Shipped",          source:"website",   customer:"Nusrat Jahan",   phone:"01912345678", area:"Chittagong / Agrabad",  advance:0,    discount:200, discType:"flat", pay:"COD",          payStatus:"pending",   fraud:"medium", agent:"—",    placedBy:"customer", date:"2025-04-14", consId:"DL140426GV77CL",  issue:null, customerNote:"",                    internalNote:"Regular customer",             items:[{pid:"p3",name:"Canvas Backpack",      size:"L",    color:"Olive",  qty:2,price:2400},{pid:"p4",name:"Silver Bracelet",size:"Free",color:"Gold",qty:1,price:1800}] },
-  { id:"O4",  num:"#1004", type:"preorder", status:"Delayed",          source:"whatsapp",  customer:"Sabrina Islam",  phone:"01612345678", area:"Sylhet / Zindabazar",   advance:500,  discount:0,   discType:"flat", pay:"Manual bKash", payStatus:"verified",  fraud:"low",    agent:"Mitu", placedBy:"agent",    date:"2025-04-10", consId:null,              issue:"Customer threatening cancellation due to delay. Needs follow-up call.", customerNote:"Delayed. ETA May 20.", internalNote:"Called, agreed to wait", items:[{pid:"p4",name:"Silver Bracelet",      size:"Free", color:"Silver", qty:1,price:1800}] },
-  { id:"O5",  num:"#1005", type:"stock",    status:"Delivered",        source:"website",   customer:"Mithila Rahman", phone:"01512345678", area:"Dhaka / Mirpur",        advance:0,    discount:0,   discType:"flat", pay:"COD",          payStatus:"collected", fraud:"low",    agent:"—",    placedBy:"customer", date:"2025-04-09", consId:"DL090426STP2R4",  issue:null, customerNote:"",                    internalNote:"",                             items:[{pid:"p5",name:"Quilted Shoulder Bag", size:"S",    color:"Beige",  qty:1,price:3500}] },
-  { id:"O6",  num:"#1006", type:"preorder", status:"Pend. Verify",     source:"instagram", customer:"Taslima Begum",  phone:"01312345678", area:"Narayanganj / Fatulla", advance:600,  discount:0,   discType:"flat", pay:"Manual bKash", payStatus:"pending",   fraud:"high",   agent:"Mitu", placedBy:"agent",    date:"2025-04-13", consId:null,              issue:"Possible fake TxID — high risk customer. Verify manually.", customerNote:"TxID: BK2025041301", internalNote:"⚠ Check TxID", items:[{pid:"p7",name:"Embroidered Clutch",   size:"Free", color:"Red",    qty:1,price:2200}] },
-  { id:"O7",  num:"#1007", type:"stock",    status:"Placed",           source:"website",   customer:"Rubina Akter",   phone:"01412345678", area:"Dhaka / Banani",        advance:0,    discount:10,  discType:"pct",  pay:"COD",          payStatus:"pending",   fraud:"medium", agent:"—",    placedBy:"customer", date:"2025-04-15", consId:null,              issue:null, customerNote:"",                    internalNote:"",                             items:[{pid:"p8",name:"Ankle Strap Heels",    size:"37",   color:"Nude",   qty:1,price:2800}] },
-  { id:"O8",  num:"#1008", type:"preorder", status:"Arrived BD",       source:"facebook",  customer:"Nasrin Sultana", phone:"01212345678", area:"Dhaka / Gulshan",       advance:1000, discount:0,   discType:"flat", pay:"bKash API",    payStatus:"verified",  fraud:"low",    agent:"Mitu", placedBy:"agent",    date:"2025-04-01", consId:null,              issue:null, customerNote:"Arrived! Preparing.",  internalNote:"",                             items:[{pid:"p1",name:"Leather Tote Bag",     size:"M",    color:"Brown",  qty:1,price:2500}] },
-  { id:"O9",  num:"#1009", type:"stock",    status:"Cancelled",        source:"phone",     customer:"Shirin Akter",   phone:"01112345678", area:"Gazipur / Tongi",       advance:0,    discount:0,   discType:"flat", pay:"COD",          payStatus:"cancelled", fraud:"high",   agent:"Rafi", placedBy:"agent",    date:"2025-04-08", consId:null,              issue:null, customerNote:"",                    internalNote:"Called 3x, no answer",         items:[{pid:"p3",name:"Canvas Backpack",      size:"L",    color:"Tan",    qty:1,price:2400}] },
-  { id:"O10", num:"#1010", type:"preorder", status:"Ordered Supplier", source:"instagram", customer:"Kohinoor Begum", phone:"01987654321", area:"Dhaka / Mohammadpur",   advance:900,  discount:0,   discType:"flat", pay:"bKash API",    payStatus:"verified",  fraud:"low",    agent:"Mitu", placedBy:"agent",    date:"2025-04-15", consId:null,              issue:null, customerNote:"ETA May 15.",          internalNote:"",                             items:[{pid:"p6",name:"Platform Sneakers",    size:"39",   color:"Black",  qty:1,price:3800},{pid:"p8",name:"Ankle Strap Heels",size:"37",color:"Nude",qty:2,price:2800}] },
-  { id:"O11", num:"#1011", type:"stock",    status:"Packed",           source:"website",   customer:"Jannat Ara",      phone:"01755667788", area:"Dhaka / Banasree",      advance:0,    discount:150, discType:"flat", pay:"COD",          payStatus:"pending",   fraud:"low",    agent:"—",    placedBy:"customer", date:"2025-04-16", consId:null,              issue:null, customerNote:"Please call before delivery", internalNote:"",                     items:[{pid:"p5",name:"Quilted Shoulder Bag", size:"M",    color:"Pink",   qty:1,price:3500}] },
-  { id:"O12", num:"#1012", type:"preorder", status:"In Transit",       source:"facebook",  customer:"Rima Khatun",     phone:"01866778899", area:"Rajshahi / Boalia",     advance:1200, discount:0,   discType:"flat", pay:"bKash API",    payStatus:"verified",  fraud:"medium", agent:"Rafi", placedBy:"agent",    date:"2025-04-11", consId:null,              issue:null, customerNote:"Need by Eid week",       internalNote:"Supplier confirmed dispatch", items:[{pid:"p2",name:"High Ankle Converse",  size:"37",   color:"Black",  qty:1,price:3200}] },
-  { id:"O13", num:"#1013", type:"stock",    status:"Out for Delivery", source:"whatsapp",  customer:"Mou Sarker",      phone:"01933445566", area:"Dhaka / Motijheel",     advance:0,    discount:5,   discType:"pct",  pay:"COD",          payStatus:"pending",   fraud:"low",    agent:"Mitu", placedBy:"agent",    date:"2025-04-17", consId:"DL170426MOU9X1",  issue:null, customerNote:"",                    internalNote:"Courier rider assigned",       items:[{pid:"p3",name:"Canvas Backpack",      size:"M",    color:"Navy",   qty:1,price:2400},{pid:"p4",name:"Silver Bracelet",size:"Free",color:"Silver",qty:1,price:1800}] },
-  { id:"O14", num:"#1014", type:"preorder", status:"Advance Paid",     source:"instagram", customer:"Lamia Noor",      phone:"01611223344", area:"Khulna / Sonadanga",     advance:1000, discount:0,   discType:"flat", pay:"Manual bKash", payStatus:"verified",  fraud:"low",    agent:"Rafi", placedBy:"agent",    date:"2025-04-16", consId:null,              issue:null, customerNote:"TxID: BK20250416443",   internalNote:"Advance verified",             items:[{pid:"p8",name:"Ankle Strap Heels",    size:"38",   color:"Black",  qty:1,price:2800}] },
-  { id:"O15", num:"#1015", type:"stock",    status:"Returned",         source:"phone",     customer:"Sathi Begum",     phone:"01344556677", area:"Mymensingh / Town",     advance:0,    discount:0,   discType:"flat", pay:"COD",          payStatus:"cancelled", fraud:"medium", agent:"Mitu", placedBy:"agent",    date:"2025-04-07", consId:"RL070426STH55",   issue:null, customerNote:"Wrong color delivered", internalNote:"Process refund after QC",      items:[{pid:"p7",name:"Embroidered Clutch",   size:"Free", color:"Blue",   qty:1,price:2200}] },
-  { id:"O16", num:"#1016", type:"preorder", status:"Confirmed",        source:"website",   customer:"Nabila Hossain",  phone:"01577889900", area:"Dhaka / Uttara",        advance:500,  discount:0,   discType:"flat", pay:"COD",          payStatus:"pending",   fraud:"low",    agent:"—",    placedBy:"customer", date:"2025-04-18", consId:null,              issue:null, customerNote:"Will pay remaining on delivery", internalNote:"Auto-created from website", items:[{pid:"p1",name:"Leather Tote Bag",     size:"L",    color:"Beige",  qty:1,price:2500},{pid:"p6",name:"Platform Sneakers",size:"40",color:"White",qty:1,price:3800}] },
-];
+const getProductVisual = (label) => {
+  const text = String(label || "Product");
+  let hash = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+    hash |= 0;
+  }
+  const idx = Math.abs(hash) % PRODUCT_ICONS.length;
+  return { img: PRODUCT_ICONS[idx], bg: PRODUCT_BGS[idx] };
+};
 
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 const SC_MAP = { "Confirmed":["#10B98115","#059669"],"Advance Paid":["#6366F115","#6366F1"],"Shipped":["#3B82F615","#2563EB"],"Delayed":["#EF444415","#DC2626"],"Delivered":["#10B98115","#059669"],"Pend. Verify":["#F59E0B20","#D97706"],"Placed":["#64748B15","#64748B"],"Arrived BD":["#A855F715","#9333EA"],"Cancelled":["#EF444415","#DC2626"],"Ordered Supplier":["#F59E0B15","#D97706"],"Packed":["#14B8A615","#0D9488"],"Returned":["#F9731615","#EA580C"] };
@@ -74,10 +54,9 @@ const TABLE_COLS = "32px minmax(88px,0.9fr) minmax(64px,0.6fr) minmax(44px,0.5fr
 
 // ── SUB-COMPONENTS — defined OUTSIDE App so React doesn't recreate them ──────
 
-function ProdImg({ pid, size }) {
-  const p = getProd(pid);
+function ProdImg({ label, size }) {
   const sz = size || 36;
-  if (!p) return <div style={{ width:sz, height:sz, borderRadius:"7px", background:"#334155", flexShrink:0 }} />;
+  const p = getProductVisual(label);
   return <div style={{ width:sz, height:sz, borderRadius:"7px", background:p.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:sz * 0.48, flexShrink:0 }}>{p.img}</div>;
 }
 
@@ -664,7 +643,7 @@ export default function App() {
                   </div>
 
                   <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
-                    <ProdImg pid={o.items[0].pid} size={28} />
+                    <ProdImg label={o.items[0].name} size={28} />
                     <div>
                       <div style={{ fontSize:"11px", color:T.textMid, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"116px" }}>
                         {o.items[0].name}{o.items.length > 1 ? ` +${o.items.length - 1}` : ""}
@@ -796,7 +775,7 @@ export default function App() {
                 <SLabel c="Products & Payment" T={T} />
                 {detail.items.map((it, j) => (
                   <div key={j} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"7px 0", borderBottom:j < detail.items.length - 1 ? `1px solid ${T.border}` : "none" }}>
-                    <ProdImg pid={it.pid} size={38} />
+                    <ProdImg label={it.name} size={38} />
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{it.name}</div>
                       <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color} × {it.qty}</div>
@@ -912,7 +891,7 @@ export default function App() {
               <SLabel c="Current Products" T={T} />
               {editItems.map((it, idx) => (
                 <div key={idx} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"9px 12px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:"8px", marginBottom:"6px" }}>
-                  <ProdImg pid={it.pid} size={36} />
+                  <ProdImg label={it.name} size={36} />
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{it.name}</div>
                     <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color} · ৳{it.price.toLocaleString()}</div>
@@ -950,7 +929,7 @@ export default function App() {
                 </div>
                 {selProd && (
                   <div style={{ display:"flex", alignItems:"center", gap:"10px", marginTop:"8px", padding:"9px 11px", background:T.bg, border:`1px solid ${T.border}`, borderRadius:"8px" }}>
-                    <ProdImg pid={selProd.id} size={42} />
+                    <ProdImg label={selProd.name} size={42} />
                     <div>
                       <div style={{ fontSize:"12px", fontWeight:700, color:T.text }}>{selProd.name}</div>
                       <div style={{ fontSize:"11px", color:T.textMuted }}>৳{selProd.price.toLocaleString()} per item</div>

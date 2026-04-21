@@ -5,24 +5,16 @@ import { getDashboardHashByRole } from "./core/nav-routes";
 const DARK  = { bg:"#0D0F14", surface:"#161820", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#FFFFFF", ib:"rgba(0,0,0,0.1)", accent:"#6366F1" };
 
-// Mock credentials — in real system these come from DB
 type RoleId = "admin" | "agent" | "product-uploader";
 
-type Account = {
+type AuthUser = {
+  id?: string;
   email: string;
-  password: string;
   name: string;
   role: RoleId;
   avatar: string;
   color: string;
 };
-
-const ACCOUNTS: Account[] = [
-  { email:"istiakshaharia77@gmail.com", password:"admin123", name:"Istiak Shaharia", role:"admin",  avatar:"IS", color:"#6366F1" },
-  { email:"rafi.ahmed@gmail.com",       password:"agent123", name:"Rafi Ahmed",      role:"agent",  avatar:"RA", color:"#059669" },
-  { email:"mitu.akter@gmail.com",       password:"agent123", name:"Mitu Akter",      role:"agent",  avatar:"MA", color:"#D97706" },
-  { email:"uploader@shopadmin.com",      password:"upload123", name:"Product Uploader", role:"product-uploader", avatar:"PU", color:"#0EA5E9" },
-];
 
 const ROLE_INFO: Record<RoleId, { label: string; color: string; icon: string; access: string }> = {
   admin: { label:"Admin",  color:"#6366F1", icon:"🛡️", access:"Full access — all pages" },
@@ -39,8 +31,6 @@ const LOCK_MINUTES = 10;
 // screen: "login" | "forgot" | "reset_sent" | "success"
 
 export default function LoginPage() {
-  const showDemoAccounts =
-    String((import.meta as any).env?.VITE_SHOW_DEMO_ACCOUNTS || "").toLowerCase() === "true";
   const [dark,      setDark]      = useState(false);
   const T = dark ? DARK : LIGHT;
   const [screen,    setScreen]    = useState<"login" | "forgot" | "reset_sent" | "success">("login");
@@ -50,7 +40,7 @@ export default function LoginPage() {
   const [remember,  setRemember]  = useState(false);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
-  const [loggedIn,  setLoggedIn]  = useState<Account | null>(null); // account object after login
+  const [loggedIn,  setLoggedIn]  = useState<AuthUser | null>(null); // user profile after login
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotErr,   setForgotErr]   = useState("");
   const [emailFocus,  setEmailFocus]  = useState(false);
@@ -79,16 +69,15 @@ export default function LoginPage() {
       return;
     }
 
-    const existingAccount = ACCOUNTS.find(
-      (account) => account.email.toLowerCase() === sessionEmail.toLowerCase()
-    );
+    const normalizedRole = String(session.user.role || "").trim().toLowerCase();
+    const role: RoleId =
+      normalizedRole === "agent"
+        ? "agent"
+        : normalizedRole === "product_uploader" || normalizedRole === "product-uploader"
+        ? "product-uploader"
+        : "admin";
 
-    if (!existingAccount) {
-      clearSession();
-      return;
-    }
-
-    window.location.hash = getDashboardHashByRole(existingAccount.role);
+    window.location.hash = getDashboardHashByRole(role);
   }, []);
 
   useEffect(() => {
@@ -117,11 +106,52 @@ export default function LoginPage() {
     }
   };
 
-  // Detect role as user types email
-  const matchedAccount = ACCOUNTS.find((a) => a.email.toLowerCase() === email.toLowerCase().trim());
-  const detectedRole   = matchedAccount ? ROLE_INFO[matchedAccount.role] : null;
+  const [detectedRole, setDetectedRole] = useState<{ label: string; color: string; icon: string; access: string } | null>(null);
 
-  const handleLogin = () => {
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+    setDetectedRole(null);
+
+    if (!normalizedEmail) {
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(normalizedEmail)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "check_email", email: normalizedEmail }),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = await response.json();
+        if (payload?.exists) {
+          // Existing active users are shown as generic account detection to avoid exposing role metadata.
+          setDetectedRole({ label: "Account", color: T.accent, icon: "🔐", access: "Active account detected" });
+        }
+      } catch {
+        // Ignore lookup errors to keep login flow resilient.
+      }
+    }, 300);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [email, T.accent]);
+
+  const handleLogin = async () => {
     setError("");
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password.trim()) {
@@ -152,37 +182,16 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const account = ACCOUNTS.find(a => a.email.toLowerCase()===normalizedEmail && a.password===password);
-      if (account) {
-        if (remember) {
-          saveSession({
-            user: {
-              email: account.email,
-              name: account.name,
-              role: account.role,
-              avatar: account.avatar,
-              color: account.color,
-            },
-            createdAt: new Date().toISOString(),
-          }, true);
-        } else {
-          saveSession({
-            user: {
-              email: account.email,
-              name: account.name,
-              role: account.role,
-              avatar: account.avatar,
-              color: account.color,
-            },
-            createdAt: new Date().toISOString(),
-          }, false);
-        }
-        persistGuard(0, 0);
-        refreshCaptcha();
-        setLoggedIn(account);
-        window.location.hash = getDashboardHashByRole(account.role);
-      } else {
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.user) {
         const nextFailed = failedAttempts + 1;
         if (nextFailed >= MAX_FAILED_ATTEMPTS) {
           const nextLockedUntil = Date.now() + LOCK_MINUTES * 60 * 1000;
@@ -191,23 +200,78 @@ export default function LoginPage() {
         } else {
           persistGuard(nextFailed, 0);
           const attemptsLeft = MAX_FAILED_ATTEMPTS - nextFailed;
-          setError(`Incorrect email or password. ${attemptsLeft} attempt(s) left.`);
+          setError(payload?.error || `Incorrect email or password. ${attemptsLeft} attempt(s) left.`);
         }
         refreshCaptcha();
+        return;
       }
+
+      const normalizedRole = String(payload.user.role || "").trim().toLowerCase();
+      const role: RoleId =
+        normalizedRole === "agent"
+          ? "agent"
+          : normalizedRole === "product_uploader" || normalizedRole === "product-uploader"
+          ? "product-uploader"
+          : "admin";
+
+      const user: AuthUser = {
+        id: payload.user.id,
+        email: payload.user.email,
+        name: payload.user.name,
+        role,
+        avatar: payload.user.avatar || "A",
+        color: payload.user.color || "#6366F1",
+      };
+
+      saveSession(
+        {
+          user: {
+            email: user.email,
+            name: user.name,
+            role: user.role,
+            avatar: user.avatar,
+            color: user.color,
+          },
+          createdAt: new Date().toISOString(),
+        },
+        remember
+      );
+
+      persistGuard(0, 0);
+      refreshCaptcha();
+      setLoggedIn(user);
+      window.location.hash = getDashboardHashByRole(user.role);
+    } catch {
+      setError("Login service unavailable. Please try again.");
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   };
 
-  const handleForgot = () => {
+  const handleForgot = async () => {
     setForgotErr("");
     if (!forgotEmail.trim()) { setForgotErr("Please enter your email address."); return; }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(forgotEmail.trim().toLowerCase())) { setForgotErr("Please enter a valid email address."); return; }
-    const exists = ACCOUNTS.find(a => a.email.toLowerCase()===forgotEmail.toLowerCase().trim());
-    if (!exists) { setForgotErr("No account found with this email address."); return; }
+
     setLoading(true);
-    setTimeout(() => { setLoading(false); setScreen("reset_sent"); }, 1000);
+    try {
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "check_email", email: forgotEmail.trim().toLowerCase() }),
+      });
+      const payload = await response.json();
+      if (!response.ok || !payload?.exists) {
+        setForgotErr("No account found with this email address.");
+        return;
+      }
+      setScreen("reset_sent");
+    } catch {
+      setForgotErr("Password reset service is currently unavailable.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const IS = (focused: boolean): CSSProperties => ({
@@ -433,34 +497,6 @@ export default function LoginPage() {
             style={{ width:"100%", background:(loading || lockedUntil > Date.now())?"#CBD5E1":T.accent, border:"none", color:(loading || lockedUntil > Date.now())?"#94A3B8":"#fff", borderRadius:"12px", padding:"14px", fontSize:"15px", fontWeight:800, cursor:(loading || lockedUntil > Date.now())?"not-allowed":"pointer", transition:"all 0.15s", boxShadow:(loading || lockedUntil > Date.now())?"none":"0 4px 16px rgba(99,102,241,0.35)", marginBottom:"20px" }}>
             {loading ? "Signing in..." : "Sign In →"}
           </button>
-
-          {showDemoAccounts && (
-            <>
-              {/* Divider */}
-              <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"20px" }}>
-                <div style={{ flex:1, height:"1px", background:T.border }}/>
-                <span style={{ fontSize:"11px", color:T.textMuted }}>test accounts</span>
-                <div style={{ flex:1, height:"1px", background:T.border }}/>
-              </div>
-
-              {/* Quick fill test accounts */}
-              <div style={{ display:"flex", flexDirection:"column", gap:"7px" }}>
-                {ACCOUNTS.map(a => (
-                  <button key={a.email} onClick={() => { setEmail(a.email); setPassword(""); setError(""); }}
-                    style={{ display:"flex", alignItems:"center", gap:"10px", padding:"10px 13px", background:T.surface, border:`1px solid ${T.border}`, borderRadius:"9px", cursor:"pointer", textAlign:"left", transition:"border-color 0.1s" }}
-                    onMouseEnter={e=>e.currentTarget.style.borderColor=a.color+"60"}
-                    onMouseLeave={e=>e.currentTarget.style.borderColor=T.border}>
-                    <div style={{ width:"30px", height:"30px", borderRadius:"50%", background:a.color, display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:"11px", fontWeight:800, flexShrink:0 }}>{a.avatar}</div>
-                    <div style={{ flex:1 }}>
-                      <div style={{ fontSize:"12px", fontWeight:700, color:T.text }}>{a.name}</div>
-                      <div style={{ fontSize:"10px", color:T.textMuted }}>{a.email}</div>
-                    </div>
-                    <span style={{ fontSize:"12px", fontWeight:700, padding:"2px 8px", borderRadius:"4px", background:ROLE_INFO[a.role].color+"18", color:ROLE_INFO[a.role].color }}>{ROLE_INFO[a.role].label}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
 
           <div style={{ marginTop:"24px", textAlign:"center", fontSize:"11px", color:T.textMuted }}>
             ShopAdmin · Little Things · Ladies Fashion BD

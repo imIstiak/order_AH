@@ -4,7 +4,7 @@ This folder contains a full relational database design for ShopAdmin.
 
 ## Included
 - schema.sql: Complete schema (users, products, variants, customers, orders, timeline, coupons, abandoned carts, batches, remittance, notifications)
-- seed.sql: Starter data matching this project's current mock/local data
+- seed.sql: Optional starter data for local development and testing
 - migrations/: Forward and rollback migration scripts applied via `schema_migrations`
 
 ## Quick Start (Docker)
@@ -38,9 +38,16 @@ psql -h localhost -U postgres -d shopadmin -f database/seed.sql
 - notification_preferences
 
 ## Notes
-- Existing UI is currently localStorage-based and mock-data based.
-- This DB is now ready for backend/API integration.
-- If you want, next step is I can create a backend service layer (Node + Express + Prisma/Drizzle) and replace localStorage stores with real API calls.
+- Runtime UI/API flows are database-backed and use server state as source of truth.
+- Seed data is optional and not required for production runtime.
+- Continue adding API endpoints for any remaining features that are still read-only.
+
+## Secret Leak Incident Checklist
+1. Rotate leaked DB credentials immediately.
+2. Replace `APP_DATABASE_URL` and `MIGRATION_DATABASE_URL` in deployment secret managers.
+3. Verify runtime APIs with the new `app_user` credential.
+4. Verify migration scripts with the new `migration_user` credential.
+5. Purge old secrets from git history after rotation.
 
 ## Credential Segregation Contract
 - `APP_DATABASE_URL` must use `app_user` credentials for runtime API access.
