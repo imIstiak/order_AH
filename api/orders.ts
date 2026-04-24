@@ -40,7 +40,8 @@ function matchesRef(order: any, ref: string): boolean {
 
 function sanitizeForPublic(order: any): object {
   const inDhaka = String(order.area || "").toLowerCase().includes("dhaka");
-  const delivery = inDhaka ? 80 : 150;
+  // Use stored delivery charge if available; fall back to area-based default
+  const delivery = Number(order.delivery) > 0 ? Number(order.delivery) : (inDhaka ? 80 : 150);
   const items: any[] = Array.isArray(order.items) ? order.items : [];
   const subtotal = items.reduce(
     (s: number, i: any) => s + (Number(i.price) || 0) * (Number(i.qty) || 1),
@@ -91,6 +92,7 @@ function sanitizeForPublic(order: any): object {
     consId: order.consId,
     discType: order.discType,
     discount: order.discount,
+    delivery,
     pay: order.pay,
     payStatus: order.payStatus,
     codDue,
@@ -99,6 +101,10 @@ function sanitizeForPublic(order: any): object {
 }
 
 export default async function handler(req: any, res: any) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization");
+  if (req.method === "OPTIONS") return res.status(200).end();
   try {
     if (req.method === "GET") {
       const ref = typeof req.query?.ref === "string" ? req.query.ref.trim() : "";
