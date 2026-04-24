@@ -48,11 +48,14 @@ export default async function handler(req: any, res: any) {
     }
 
     const clientRole = normalizeRoleForClient(user.role);
+    const displayName = String(
+      user.name || user.display_name || user.username || user.full_name || ""
+    ).trim() || safeEmail(user.email).split("@")[0];
     return res.status(200).json({
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        name: displayName,
         role: clientRole,
         avatar: user.avatar || "A",
         color: user.color || "#6366F1",
