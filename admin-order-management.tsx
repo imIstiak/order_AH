@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
+import { adminFetch } from "./core/api-client";
 import { assignOrdersToBatch, createBatch, getOrderBatchMembership, listBatches } from "./core/batch-store";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
@@ -36,11 +37,11 @@ const AGENT_NAV = [["▦","Dashboard"],["≡","Orders"],["⬡","Products"],["◉
 const VIEW_ORDER_KEY = "shopadmin.viewOrder.num";
 
 // ── HELPERS ──────────────────────────────────────────────────────────────────
-const isDhaka    = (a) => a.toLowerCase().includes("dhaka");
+const isDhaka    = (a) => String(a || "").toLowerCase().includes("dhaka");
 const normalizeOrderId = (orderId) => String(orderId || "").trim().toLowerCase();
-const itemsTotal = (items) => items.reduce((s, i) => s + i.price * i.qty, 0);
-const applyDisc  = (sub, disc, dt) => !disc ? sub : dt === "pct" ? sub * (1 - disc / 100) : sub - disc;
-const calcDue    = (o, dIn, dOut) => Math.max(0, applyDisc(itemsTotal(o.items), o.discount, o.discType) + (isDhaka(o.area) ? dIn : dOut) - o.advance);
+const itemsTotal = (items) => (Array.isArray(items) ? items : []).reduce((s, i) => s + (Number(i.price) || 0) * (Number(i.qty) || 0), 0);
+const applyDisc  = (sub, disc, dt) => !disc ? sub : dt === "pct" ? sub * (1 - (Number(disc) || 0) / 100) : sub - (Number(disc) || 0);
+const calcDue    = (o, dIn, dOut) => Math.max(0, applyDisc(itemsTotal(o.items), o.discount, o.discType) + (isDhaka(o.area) ? dIn : dOut) - (Number(o.advance) || 0));
 const buildTrackingLink = () => `${window.location.origin}/#/track`;
 const getPathaoDeliveryStatus = (o) => {
   if (o.status === "Delivered") return "Delivered";
@@ -111,7 +112,7 @@ function PrintSlip({ order, type, dIn, dOut, T }) {
       <div style={{ fontSize:"11px", color:T.textMuted }}>📍 {order.area}</div>
       {type !== "label" && order.items.map((it, j) => (
         <div key={j} style={{ fontSize:"11px", color:T.textMuted, marginTop:"3px" }}>
-          • {it.name} {it.size !== "Free" ? `Sz ${it.size}` : ""} {it.color} ×{it.qty} = ৳{(it.price * it.qty).toLocaleString()}
+          • {it.name} {it.size && it.size !== "Free" ? `Sz ${it.size}` : ""}{it.color && it.color !== "Default" ? ` ${it.color}` : ""} ×{it.qty} = ৳{((Number(it.price)||0) * (Number(it.qty)||0)).toLocaleString()}
         </div>
       ))}
       <div style={{ display:"flex", justifyContent:"space-between", marginTop:"8px", paddingTop:"6px", borderTop:`1px solid ${T.border}` }}>
@@ -215,7 +216,7 @@ export default function App() {
     const loadCatalog = async () => {
       setCatalogError("");
       try {
-        const response = await fetch("/api/products", { cache: "no-store" });
+        const response = await adminFetch("/api/products", { cache: "no-store" });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) {
           throw new Error(payload?.error || "Failed to load product catalog.");
@@ -643,13 +644,17 @@ export default function App() {
                   </div>
 
                   <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
-                    <ProdImg label={o.items[0].name} size={28} />
-                    <div>
-                      <div style={{ fontSize:"11px", color:T.textMid, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"116px" }}>
-                        {o.items[0].name}{o.items.length > 1 ? ` +${o.items.length - 1}` : ""}
-                      </div>
-                      <div style={{ fontSize:"10px", color:T.textMuted }}>{o.items[0].size !== "Free" ? `Sz ${o.items[0].size} · ` : ""}{o.items[0].color} ×{o.items[0].qty}</div>
-                    </div>
+                    {Array.isArray(o.items) && o.items.length > 0 ? (
+                      <>
+                        <ProdImg label={o.items[0].name} size={28} />
+                        <div>
+                          <div style={{ fontSize:"11px", color:T.textMid, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", maxWidth:"116px" }}>
+                            {o.items[0].name}{o.items.length > 1 ? ` +${o.items.length - 1}` : ""}
+                          </div>
+                          <div style={{ fontSize:"10px", color:T.textMuted }}>{o.items[0].size && o.items[0].size !== "Free" ? `Sz ${o.items[0].size} · ` : ""}{o.items[0].color && o.items[0].color !== "Default" ? `${o.items[0].color} · ` : ""}×{Number(o.items[0].qty)||1}</div>
+                        </div>
+                      </>
+                    ) : <span style={{ fontSize:"10px", color:T.textMuted }}>—</span>}
                   </div>
 
                   <div>
@@ -778,7 +783,7 @@ export default function App() {
                     <ProdImg label={it.name} size={38} />
                     <div style={{ flex:1 }}>
                       <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{it.name}</div>
-                      <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color} × {it.qty}</div>
+                      <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size && it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color && it.color !== "Default" ? `${it.color} · ` : ""}×{it.qty}</div>
                     </div>
                     <div style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{(it.price * it.qty).toLocaleString()}</div>
                   </div>
@@ -894,7 +899,7 @@ export default function App() {
                   <ProdImg label={it.name} size={36} />
                   <div style={{ flex:1 }}>
                     <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{it.name}</div>
-                    <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color} · ৳{it.price.toLocaleString()}</div>
+                    <div style={{ fontSize:"10px", color:T.textMuted }}>{it.size && it.size !== "Free" ? `Sz ${it.size} · ` : ""}{it.color && it.color !== "Default" ? `${it.color} · ` : ""}৳{(Number(it.price)||0).toLocaleString()}</div>
                   </div>
                   <div style={{ display:"flex", alignItems:"center", gap:"6px" }}>
                     <button onClick={() => changeQty(idx, it.qty - 1)} style={{ width:"26px", height:"26px", background:T.surface, border:`1px solid ${T.border}`, color:T.textMid, borderRadius:"6px", cursor:"pointer", fontSize:"15px", fontWeight:700, lineHeight:1 }}>−</button>
