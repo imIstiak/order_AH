@@ -3,16 +3,17 @@ import { navigateByAdminNavLabel } from "./core/nav-routes";
 import { clearSession, loadSession } from "./core/auth-session";
 import AdminSidebar from "./core/admin-sidebar";
 import { loadAppState, saveAppState } from "./core/app-state-client";
+import { adminFetch } from "./core/api-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1" };
 
-const NAV = [["?","Dashboard"],["=","Orders"],["??","Batches"],["?","Pre-Orders"],["?","Products"],["?","Customers"],["?","Abandoned"],["?","Coupons"],["$","Remittance"],["?","Analytics"],["?","Settings"]];
+const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const TABS = [
-  { id:"profile",  icon:"??", label:"Profile Info" },
-  { id:"password", icon:"??", label:"Change Password" },
-  { id:"notifs",   icon:"??", label:"Notifications" },
+  { id:"profile",  icon:"👤", label:"Profile Info" },
+  { id:"password", icon:"🔒", label:"Change Password" },
+  { id:"notifs",   icon:"🔔", label:"Notifications" },
 ] as const;
 
 function Field({ label, value, onChange, T, type = "text" }: { label: string; value: string; onChange: (e: any) => void; T: any; type?: string }) {
@@ -114,7 +115,7 @@ function ProfileTab({ T }: { T: any }) {
         reader.onerror = () => reject(new Error("Failed to read avatar file."));
         reader.readAsDataURL(file);
       });
-      const res = await fetch("/api/r2-upload", {
+      const res = await adminFetch("/api/r2-upload", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ filename: file.name, contentType: file.type || "image/png", dataUrl, folder: "profile-avatar" }),

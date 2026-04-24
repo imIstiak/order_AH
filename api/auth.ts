@@ -1,6 +1,7 @@
 export const config = { runtime: "nodejs" };
 
-import { getDb } from "./_db.js";
+import { createSessionToken } from "./_auth.js";
+import { checkEmailExists, authenticateUser } from "./_rest.js";
 
 type ClientRole = "admin" | "agent" | "product-uploader";
 
@@ -21,26 +22,13 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const pool = await getDb();
     const action = String(req.body?.action || "login").toLowerCase();
 
     if (action === "check_email") {
       const email = safeEmail(req.body?.email);
-      if (!email) {
-        return res.status(400).json({ error: "Email is required." });
-      }
-
-      const existing = await pool.query(
-        `
-          select 1
-          from app_users
-          where lower(email) = $1 and is_active = true
-          limit 1
-        `,
-        [email]
-      );
-
-      return res.status(200).json({ exists: existing.rows.length > 0 });
+      if (!email) return res.status(400).json({ error: "Email is required." });
+      const exists = await checkEmailExists(email);
+      return res.status(200).json({ exists });
     }
 
     const email = safeEmail(req.body?.email);
@@ -50,35 +38,27 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: "Email and password are required." });
     }
 
-    const userResult = await pool.query(
-      `
-        select id, email, name, role, avatar, color
-        from app_users
-        where lower(email) = $1
-          and is_active = true
-          and password_hash is not null
-          and password_hash = crypt($2, password_hash)
-        limit 1
-      `,
-      [email, password]
-    );
-
-    const user = userResult.rows[0];
+    const user = await authenticateUser(email, password);
     if (!user) {
       return res.status(401).json({ error: "Incorrect email or password." });
     }
 
+    const clientRole = normalizeRoleForClient(user.role);
     return res.status(200).json({
       user: {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: normalizeRoleForClient(user.role),
+        role: clientRole,
         avatar: user.avatar || "A",
         color: user.color || "#6366F1",
       },
+      token: createSessionToken(String(user.id), clientRole),
     });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "Authentication failed." });
+    const isDev = process.env.NODE_ENV !== "production";
+    return res.status(500).json({
+      error: isDev ? (error?.message || "Authentication failed.") : "An internal error occurred.",
+    });
   }
 }

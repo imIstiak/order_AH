@@ -256,6 +256,11 @@ export default function Dashboard() {
     return items.reduce((sum: number, item: any) => sum + Number(item?.price || 0) * Number(item?.qty || 0), 0);
   };
 
+  // Exclude cancelled / returned / refunded orders from all revenue calculations
+  const EXCLUDED_STATUSES = new Set(["Cancelled","Returned","Refunded","Return","Cancel","Refund"]);
+  const isRevenueEligible = (order: any) =>
+    !EXCLUDED_STATUSES.has(String(order?.status || ""));
+
   const srcMeta = (source: string) => {
     const key = String(source || "").toLowerCase();
     if (key === "facebook") return { icon: "📘", color: "#1877F2", name: "Facebook" };
@@ -287,6 +292,7 @@ export default function Dashboard() {
   }
 
   orders.forEach((order: any) => {
+    if (!isRevenueEligible(order)) return;
     const d = new Date(String(order?.date || order?.updatedAt || ""));
     if (Number.isNaN(d.getTime())) return;
     const key = dayKey(d);
@@ -302,6 +308,7 @@ export default function Dashboard() {
 
   const sourceMap = new Map<string, SourceData>();
   orders.forEach((order: any) => {
+    if (!isRevenueEligible(order)) return;
     const amount = calcOrderAmount(order);
     const meta = srcMeta(String(order?.source || ""));
     const cur = sourceMap.get(meta.name) || { ...meta, orders: 0, revenue: 0 };
@@ -313,6 +320,7 @@ export default function Dashboard() {
 
   const itemMap = new Map<string, { name: string; orders: number; revenue: number; topVar: Record<string, number> }>();
   orders.forEach((order: any) => {
+    if (!isRevenueEligible(order)) return;
     const items = Array.isArray(order?.items) ? order.items : [];
     items.forEach((item: any) => {
       const name = String(item?.name || "Unnamed Product");
@@ -511,7 +519,9 @@ export default function Dashboard() {
 
   const todayRevenue = REVENUE_BARS[REVENUE_BARS.length - 1]?.revenue || 0;
   const todayOrders = REVENUE_BARS[REVENUE_BARS.length - 1]?.orders || 0;
-  const totalCodDue = orders.reduce((sum: number, order: any) => sum + Math.max(0, calcOrderAmount(order) - Number(order?.advance || 0)), 0);
+  const totalCodDue = orders
+    .filter((order: any) => isRevenueEligible(order))
+    .reduce((sum: number, order: any) => sum + Math.max(0, calcOrderAmount(order) - Number(order?.advance || 0)), 0);
 
   const STATS: StatItem[] = [
     { label:"Today's Revenue",   value:"৳"+todayRevenue.toLocaleString(),                  sub:`${todayOrders} orders today`,   color:"#6366F1", icon:"💰" },

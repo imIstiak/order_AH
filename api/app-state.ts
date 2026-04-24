@@ -1,5 +1,7 @@
 export const config = { runtime: "nodejs" };
-import { assertAppStateSchema, getDb } from "./_db.js";
+
+import { requireAuth } from "./_auth.js";
+import { getAppState, setAppState } from "./_rest.js";
 
 function safeKey(raw: unknown): string {
   return String(raw || "").trim();
@@ -14,34 +16,28 @@ function resolveStateValue(body: any): unknown {
 
 export default async function handler(req: any, res: any) {
   try {
-    const pool = await getDb();
-    await assertAppStateSchema(pool);
-
     if (req.method === "GET") {
+      if (!requireAuth(req, res)) return;
       const key = safeKey(req.query?.key);
       if (!key) return res.status(400).json({ error: "Missing key." });
-      const result = await pool.query(`select state_value, updated_at from app_state where state_key = $1 limit 1`, [key]);
-      return res.status(200).json({ key, value: result.rows[0]?.state_value ?? null, updatedAt: result.rows[0]?.updated_at || null });
+      const { value, updatedAt } = await getAppState(key);
+      return res.status(200).json({ key, value, updatedAt });
     }
 
     if (req.method === "PUT") {
+      if (!requireAuth(req, res)) return;
       const key = safeKey(req.body?.key);
       if (!key) return res.status(400).json({ error: "Missing key." });
       const value = resolveStateValue(req.body);
-      await pool.query(
-        `
-          insert into app_state (state_key, state_value, updated_at)
-          values ($1, $2::jsonb, now())
-          on conflict (state_key)
-          do update set state_value = excluded.state_value, updated_at = now()
-        `,
-        [key, JSON.stringify(value)]
-      );
+      await setAppState(key, value);
       return res.status(200).json({ ok: true, key, value });
     }
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (error: any) {
-    return res.status(500).json({ error: error?.message || "App state API failed." });
+    const isDev = process.env.NODE_ENV !== "production";
+    return res.status(500).json({
+      error: isDev ? (error?.message || "App state API failed.") : "An internal error occurred.",
+    });
   }
 }

@@ -46,16 +46,16 @@ type Cart = {
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
 
-const NAV: Array<[string, string]> = [["â–¦","Dashboard"],["â‰¡","Orders"],["ðŸ“¦","Batches"],["â³","Pre-Orders"],["â¬¡","Products"],["â—‰","Customers"],["âŠ¡","Abandoned"],["â—ˆ","Coupons"],["$","Remittance"],["âŒ—","Analytics"],["âš™","Settings"]];
+const NAV: Array<[string, string]> = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
-const SRC_ICON: Record<Source, string> = { facebook:"ðŸ“˜", instagram:"ðŸ“¸", whatsapp:"ðŸ’¬", website:"ðŸŒ", phone:"ðŸ“ž" };
+const SRC_ICON: Record<Source, string> = { facebook:"📘", instagram:"📸", whatsapp:"💬", website:"🌐", phone:"📞" };
 
 const STATUS_MAP: Record<CartStatus, { label: string; color: string; bg: string; icon: string }> = {
-  new:             { label:"New",             color:"#6366F1", bg:"#6366F115", icon:"ðŸ†•" },
-  reminded:        { label:"1st Reminder Sent",color:"#D97706",bg:"#F59E0B15", icon:"ðŸ“²" },
-  reminded_twice:  { label:"2nd Reminder Sent",color:"#A855F7",bg:"#A855F715", icon:"ðŸ“²ðŸ“²" },
-  converted:       { label:"Converted âœ“",     color:"#059669", bg:"#10B98115", icon:"âœ…" },
-  expired:         { label:"Expired",          color:"#64748B", bg:"#64748B15", icon:"â°" },
+  new:             { label:"New",             color:"#6366F1", bg:"#6366F115", icon:"🆕" },
+  reminded:        { label:"1st Reminder Sent",color:"#D97706",bg:"#F59E0B15", icon:"📲" },
+  reminded_twice:  { label:"2nd Reminder Sent",color:"#A855F7",bg:"#A855F715", icon:"📲📲" },
+  converted:       { label:"Converted ✓",     color:"#059669", bg:"#10B98115", icon:"✅" },
+  expired:         { label:"Expired",          color:"#64748B", bg:"#64748B15", icon:"⏰" },
 };
 
 const formatAge = (mins: number) => {
@@ -64,7 +64,7 @@ const formatAge = (mins: number) => {
   return `${Math.round(mins/1440)}d ago`;
 };
 
-// â”€â”€ SUB-COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 
 function SL({ c, T }: { c: ReactNode; T: any }) {
   return <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"5px" }}>{c}</div>;
@@ -77,7 +77,7 @@ function StatusBadge({ status }: { status: CartStatus }) {
 
 function ReminderDot({ reminder }: { reminder: Reminder }) {
   const color = reminder.status==="read"?"#059669":reminder.status==="delivered"?"#2563EB":reminder.status==="failed"?"#DC2626":"#D97706";
-  const icon  = reminder.channel==="whatsapp"?"ðŸ’¬":"ðŸ“²";
+  const icon  = reminder.channel==="whatsapp"?"💬":"📲";
   return (
     <div style={{ display:"flex", alignItems:"center", gap:"4px", fontSize:"10px" }}>
       <span>{icon}</span>
@@ -98,7 +98,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
   const reminderNum = cart.reminders.length + 1;
   const defaultMsg  = reminderNum === 1
     ? `Hi ${cart.customer.split(" ")[0]}! You left some items in your cart. Complete your order here: yourshop.com/cart`
-    : `Hi ${cart.customer.split(" ")[0]}! Your cart is still waiting ðŸ›ï¸${withCoupon?` Use code ${coupon} for 10% off!`:""} yourshop.com/cart`;
+    : `Hi ${cart.customer.split(" ")[0]}! Your cart is still waiting 🛍️${withCoupon?` Use code ${coupon} for 10% off!`:""} yourshop.com/cart`;
 
   const handleSend = () => {
     setSending(true);
@@ -115,7 +115,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
     <div style={{ width:"380px", background:T.sidebar, borderLeft:`1px solid ${T.border}`, display:"flex", flexDirection:"column", flexShrink:0 }}>
       <div style={{ padding:"13px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
         <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Cart Details</span>
-        <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>âœ•</button>
+        <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>✕</button>
       </div>
 
       <div style={{ flex:1, overflow:"auto", padding:"16px" }}>
@@ -123,12 +123,12 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
         {/* Customer */}
         <div style={{ background:T.bg, borderRadius:"10px", padding:"12px 14px", marginBottom:"14px" }}>
           <div style={{ fontSize:"15px", fontWeight:800, color:T.text, marginBottom:"3px" }}>{cart.customer}</div>
-          <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"6px" }}>ðŸ“ž {cart.phone} Â· {SRC_ICON[cart.source]} {cart.source}</div>
+          <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"6px" }}>📞 {cart.phone} · {SRC_ICON[cart.source]} {cart.source}</div>
           <div style={{ display:"flex", gap:"7px", alignItems:"center" }}>
             <StatusBadge status={cart.status}/>
             <span style={{ fontSize:"11px", color:T.textMuted }}>{cart.abandonedAt}</span>
           </div>
-          {cart.converted && <div style={{ marginTop:"8px", fontSize:"11px", color:"#059669", fontWeight:600 }}>âœ… Converted â†’ Order {cart.orderId}</div>}
+          {cart.converted && <div style={{ marginTop:"8px", fontSize:"11px", color:"#059669", fontWeight:600 }}>✅ Converted → Order {cart.orderId}</div>}
         </div>
 
         {/* Cart items */}
@@ -139,14 +139,14 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
               <div style={{ width:"34px", height:"34px", borderRadius:"7px", background:it.bg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"17px", flexShrink:0 }}>{it.img}</div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:"12px", fontWeight:600, color:T.text }}>{it.name}</div>
-                <div style={{ fontSize:"10px", color:T.textMuted }}>{it.variant} Ã— {it.qty}</div>
+                <div style={{ fontSize:"10px", color:T.textMuted }}>{it.variant} × {it.qty}</div>
               </div>
-              <div style={{ fontSize:"12px", fontWeight:700, color:T.text }}>à§³{it.price.toLocaleString()}</div>
+              <div style={{ fontSize:"12px", fontWeight:700, color:T.text }}>৳{it.price.toLocaleString()}</div>
             </div>
           ))}
           <div style={{ display:"flex", justifyContent:"space-between", padding:"8px 12px", background:T.accent+"08", border:`1px solid ${T.accent}20`, borderRadius:"8px" }}>
             <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Cart Total</span>
-            <span style={{ fontSize:"15px", fontWeight:800, color:T.accent }}>à§³{cart.cartValue.toLocaleString()}</span>
+            <span style={{ fontSize:"15px", fontWeight:800, color:T.accent }}>৳{cart.cartValue.toLocaleString()}</span>
           </div>
         </div>
 
@@ -166,7 +166,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
               ))}
               {cart.couponSent && (
                 <div style={{ padding:"7px 12px", background:"#6366F115", border:"1px solid #6366F125", borderRadius:"7px", fontSize:"11px", color:"#6366F1", fontWeight:600 }}>
-                  ðŸŽ Coupon sent: {cart.couponSent}
+                  🎁 Coupon sent: {cart.couponSent}
                 </div>
               )}
             </div>
@@ -180,7 +180,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
 
             {/* Channel */}
             <div style={{ display:"flex", gap:"7px", marginBottom:"10px" }}>
-              {([["sms","ðŸ“² SMS"],["whatsapp","ðŸ’¬ WhatsApp"]] as Array<[ReminderChannel, string]>).map(([id,label]) => (
+              {([["sms","📲 SMS"],["whatsapp","💬 WhatsApp"]] as Array<[ReminderChannel, string]>).map(([id,label]) => (
                 <button key={id} onClick={() => setChannel(id)}
                   style={{ flex:1, padding:"8px", borderRadius:"8px", border:`1.5px solid ${channel===id?(id==="whatsapp"?"#25D366":"#6366F1"):T.border}`, background:channel===id?(id==="whatsapp"?"#25D36615":"#6366F115"):T.bg, color:channel===id?(id==="whatsapp"?"#25D366":"#6366F1"):T.textMuted, fontSize:"12px", fontWeight:700, cursor:"pointer" }}>
                   {label}
@@ -206,7 +206,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
 
             {sent ? (
               <div style={{ padding:"10px 14px", background:"#05996915", border:"1px solid #05996930", borderRadius:"8px", fontSize:"12px", color:"#059669", fontWeight:600, textAlign:"center" }}>
-                âœ“ Reminder sent successfully!
+                ✓ Reminder sent successfully!
               </div>
             ) : (
               <button onClick={handleSend} disabled={sending}
@@ -221,7 +221,7 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
         {!cart.converted && (
           <button onClick={() => onMarkConverted(cart.id)}
             style={{ width:"100%", background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>
-            âœ“ Mark as Manually Converted
+            ✓ Mark as Manually Converted
           </button>
         )}
       </div>
@@ -229,10 +229,10 @@ function CartPanel({ cart, onClose, onSendReminder, onMarkConverted, T }: { cart
   );
 }
 
-// â”€â”€ BULK SEND MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── BULK SEND MODAL ───────────────────────────────────────────────────────
 function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (channel: ReminderChannel, msg: string, coupon: string | null) => void; onClose: () => void; T: any }) {
   const [channel,    setChannel]    = useState<ReminderChannel>("sms");
-  const [msg,        setMsg]        = useState("Hi! You left items in your cart ðŸ›ï¸ Complete your order here: yourshop.com/cart");
+  const [msg,        setMsg]        = useState("Hi! You left items in your cart 🛍️ Complete your order here: yourshop.com/cart");
   const [withCoupon, setWithCoupon] = useState(false);
   const [coupon,     setCoupon]     = useState("COMEBACK10");
   const [sending,    setSending]    = useState(false);
@@ -257,12 +257,12 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
             <div style={{ fontSize:"14px", fontWeight:800, color:T.text }}>Send Bulk Reminder</div>
             <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"2px" }}>Sending to <strong style={{ color:T.accent }}>{count} customers</strong></div>
           </div>
-          <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>âœ•</button>
+          <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer" }}>✕</button>
         </div>
 
         {done ? (
           <div style={{ padding:"40px 30px", textAlign:"center" }}>
-            <div style={{ fontSize:"40px", marginBottom:"12px" }}>âœ…</div>
+            <div style={{ fontSize:"40px", marginBottom:"12px" }}>✅</div>
             <div style={{ fontSize:"16px", fontWeight:800, color:T.text, marginBottom:"6px" }}>Reminders Sent!</div>
             <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"20px" }}>Successfully sent via {channel==="whatsapp"?"WhatsApp":"SMS"} to {count} customers.</div>
             <button onClick={() => { onSend(channel, msg, withCoupon?coupon:null); }}
@@ -274,7 +274,7 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
             <div style={{ marginBottom:"14px" }}>
               <div style={{ fontSize:"11px", fontWeight:600, color:T.text, marginBottom:"8px" }}>Send Via</div>
               <div style={{ display:"flex", gap:"8px" }}>
-                {([["sms","ðŸ“² SMS","#6366F1"],["whatsapp","ðŸ’¬ WhatsApp","#25D366"]] as Array<[ReminderChannel, string, string]>).map(([id,label,color])=>(
+                {([["sms","📲 SMS","#6366F1"],["whatsapp","💬 WhatsApp","#25D366"]] as Array<[ReminderChannel, string, string]>).map(([id,label,color])=>(
                   <button key={id} onClick={() => setChannel(id)}
                     style={{ flex:1, padding:"10px", borderRadius:"9px", border:`2px solid ${channel===id?color:T.border}`, background:channel===id?color+"12":T.bg, color:channel===id?color:T.textMuted, fontSize:"13px", fontWeight:700, cursor:"pointer" }}>
                     {label}
@@ -314,7 +314,7 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
             <div style={{ marginBottom:"14px" }}>
               <div style={{ fontSize:"11px", fontWeight:600, color:T.text, marginBottom:"6px" }}>Message</div>
               <textarea value={msg} onChange={e=>setMsg(e.target.value)} style={TA}/>
-              <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"4px" }}>{fullMsg.length} characters{channel==="sms"?` Â· ~${Math.ceil(fullMsg.length/160)} SMS per person`:""}</div>
+              <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"4px" }}>{fullMsg.length} characters{channel==="sms"?` · ~${Math.ceil(fullMsg.length/160)} SMS per person`:""}</div>
             </div>
 
             {/* Preview */}
@@ -327,7 +327,7 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
               <button onClick={onClose} style={{ flex:1, background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
               <button onClick={handle} disabled={sending}
                 style={{ flex:2, background:sending?T.bg:T.accent, border:`1px solid ${sending?T.border:T.accent}`, color:sending?T.textMuted:"#fff", borderRadius:"9px", padding:"10px", fontSize:"13px", fontWeight:700, cursor:sending?"not-allowed":"pointer" }}>
-                {sending ? "Sending..." : `ðŸ“¤ Send to ${count} Customers`}
+                {sending ? "Sending..." : `📤 Send to ${count} Customers`}
               </button>
             </div>
           </div>
@@ -337,7 +337,7 @@ function BulkSendModal({ count, onSend, onClose, T }: { count: number; onSend: (
   );
 }
 
-// â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN ──────────────────────────────────────────────────────────────────
 export default function AbandonedCartPage() {
   const [dark, setDark]         = useState(false);
   const T = dark ? DARK : LIGHT;
@@ -436,12 +436,12 @@ export default function AbandonedCartPage() {
   const recoveredVal = carts.filter(c=>c.converted).reduce((a,b)=>a+b.cartValue,0);
 
   const STATS = [
-    { label:"Active Carts",      value:active,                                  sub:"Need follow-up",           color:"#D97706", icon:"ðŸ›’" },
-    { label:"Total Value",       value:"à§³"+totalValue.toLocaleString(),         sub:"Revenue at risk",           color:"#DC2626", icon:"ðŸ’¸" },
-    { label:"Converted",         value:converted,                                sub:`${convRate}% conversion rate`, color:"#059669", icon:"âœ…" },
-    { label:"Revenue Recovered", value:"à§³"+recoveredVal.toLocaleString(),       sub:"From converted carts",      color:"#059669", icon:"ðŸ’°" },
-    { label:"Reminders Sent",    value:carts.reduce((a,b)=>a+b.reminders.length,0), sub:"Total across all carts", color:"#6366F1", icon:"ðŸ“²" },
-    { label:"Awaiting 1st Reminder", value:carts.filter(c=>c.status==="new"&&!c.converted).length, sub:"Not yet contacted", color:"#A855F7", icon:"â³" },
+    { label:"Active Carts",      value:active,                                  sub:"Need follow-up",           color:"#D97706", icon:"🛒" },
+    { label:"Total Value",       value:"৳"+totalValue.toLocaleString(),         sub:"Revenue at risk",           color:"#DC2626", icon:"💸" },
+    { label:"Converted",         value:converted,                                sub:`${convRate}% conversion rate`, color:"#059669", icon:"✅" },
+    { label:"Revenue Recovered", value:"৳"+recoveredVal.toLocaleString(),       sub:"From converted carts",      color:"#059669", icon:"💰" },
+    { label:"Reminders Sent",    value:carts.reduce((a,b)=>a+b.reminders.length,0), sub:"Total across all carts", color:"#6366F1", icon:"📲" },
+    { label:"Awaiting 1st Reminder", value:carts.filter(c=>c.status==="new"&&!c.converted).length, sub:"Not yet contacted", color:"#A855F7", icon:"⏳" },
   ];
 
   return (
@@ -468,12 +468,12 @@ export default function AbandonedCartPage() {
         {/* Topbar */}
         <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 18px", gap:"10px", flexShrink:0 }}>
           <div style={{ flex:1, position:"relative" }}>
-            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>ðŸ”</span>
+            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>🔍</span>
             <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search customer name or phone..."
               style={{ width:"100%", background:T.bg, border:`1px solid ${T.border}`, borderRadius:"8px", padding:"7px 10px 7px 30px", color:T.text, fontSize:"12px", outline:"none", boxSizing:"border-box" }}/>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:"7px", padding:"6px 12px", background:"#D9770612", border:"1px solid #D9770625", borderRadius:"8px" }}>
-            <span style={{ fontSize:"12px" }}>âš™ï¸</span>
+            <span style={{ fontSize:"12px" }}>⚙️</span>
             <span style={{ fontSize:"11px", color:"#D97706", fontWeight:600 }}>Auto-reminders: ON</span>
           </div>
         </div>
@@ -521,13 +521,13 @@ export default function AbandonedCartPage() {
               <div style={{ display:"flex", alignItems:"center", gap:"12px", padding:"10px 16px", background:T.accent+"0A", border:`1px solid ${T.accent}25`, borderRadius:"10px", marginBottom:"10px" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
                   <div style={{ width:"18px", height:"18px", borderRadius:"4px", background:T.accent, display:"flex", alignItems:"center", justifyContent:"center" }}>
-                    <span style={{ color:"#fff", fontSize:"11px", fontWeight:800 }}>âœ“</span>
+                    <span style={{ color:"#fff", fontSize:"11px", fontWeight:800 }}>✓</span>
                   </div>
                   <span style={{ fontSize:"13px", fontWeight:700, color:T.accent }}>{bulkSelected.length} selected</span>
                 </div>
                 <div style={{ height:"16px", width:"1px", background:T.border }}/>
                 <span style={{ fontSize:"11px", color:T.textMuted }}>
-                  Cart value: <strong style={{ color:T.text }}>à§³{carts.filter(c=>bulkSelected.includes(c.id)).reduce((a,b)=>a+b.cartValue,0).toLocaleString()}</strong>
+                  Cart value: <strong style={{ color:T.text }}>৳{carts.filter(c=>bulkSelected.includes(c.id)).reduce((a,b)=>a+b.cartValue,0).toLocaleString()}</strong>
                 </span>
                 <div style={{ marginLeft:"auto", display:"flex", gap:"8px" }}>
                   <button onClick={() => setBulkSelected([])}
@@ -536,7 +536,7 @@ export default function AbandonedCartPage() {
                   </button>
                   <button onClick={() => setShowBulkModal(true)}
                     style={{ background:T.accent, border:"none", color:"#fff", borderRadius:"7px", padding:"7px 16px", fontSize:"12px", fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:"6px" }}>
-                    ðŸ“¤ Send Reminder to {bulkSelected.length}
+                    📤 Send Reminder to {bulkSelected.length}
                   </button>
                 </div>
               </div>
@@ -549,8 +549,8 @@ export default function AbandonedCartPage() {
                 {/* Select all checkbox */}
                 <div onClick={toggleAll}
                   style={{ width:"16px", height:"16px", borderRadius:"4px", border:`1.5px solid ${allSelected?T.accent:T.border}`, background:allSelected?T.accent:"transparent", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
-                  {allSelected && <span style={{ color:"#fff", fontSize:"10px", fontWeight:800 }}>âœ“</span>}
-                  {!allSelected && bulkSelected.length>0 && <span style={{ color:T.accent, fontSize:"10px", fontWeight:800 }}>â€”</span>}
+                  {allSelected && <span style={{ color:"#fff", fontSize:"10px", fontWeight:800 }}>✓</span>}
+                  {!allSelected && bulkSelected.length>0 && <span style={{ color:T.accent, fontSize:"10px", fontWeight:800 }}>—</span>}
                 </div>
                 {["Customer","Abandoned","Cart Value","Products","Source","Status / Reminders",""].map((h,i) => (
                   <div key={i} style={{ fontSize:"10px", fontWeight:700, color:T.textMuted, textTransform:"uppercase", letterSpacing:"0.5px" }}>{h}</div>
@@ -572,7 +572,7 @@ export default function AbandonedCartPage() {
                     {/* Checkbox */}
                     <div onClick={e=>{ e.stopPropagation(); if(needsAction) toggleBulk(c.id); }}
                       style={{ width:"16px", height:"16px", borderRadius:"4px", border:`1.5px solid ${isBulkChecked?T.accent:T.border}`, background:isBulkChecked?T.accent:"transparent", cursor:needsAction?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center", opacity:needsAction?1:0.3 }}>
-                      {isBulkChecked && <span style={{ color:"#fff", fontSize:"10px", fontWeight:800 }}>âœ“</span>}
+                      {isBulkChecked && <span style={{ color:"#fff", fontSize:"10px", fontWeight:800 }}>✓</span>}
                     </div>
 
                     {/* Customer */}
@@ -591,7 +591,7 @@ export default function AbandonedCartPage() {
                     </div>
 
                     {/* Value */}
-                    <div style={{ fontSize:"14px", fontWeight:800, color:T.accent }}>à§³{c.cartValue.toLocaleString()}</div>
+                    <div style={{ fontSize:"14px", fontWeight:800, color:T.accent }}>৳{c.cartValue.toLocaleString()}</div>
 
                     {/* Products */}
                     <div style={{ display:"flex", gap:"3px" }}>
@@ -612,7 +612,7 @@ export default function AbandonedCartPage() {
                           {c.reminders.map((r,j) => <ReminderDot key={j} reminder={r}/>)}
                         </div>
                       )}
-                      {c.couponSent && <div style={{ fontSize:"9px", color:"#6366F1", marginTop:"3px", fontWeight:600 }}>ðŸŽ {c.couponSent}</div>}
+                      {c.couponSent && <div style={{ fontSize:"9px", color:"#6366F1", marginTop:"3px", fontWeight:600 }}>🎁 {c.couponSent}</div>}
                     </div>
 
                     {/* Action */}
@@ -620,10 +620,10 @@ export default function AbandonedCartPage() {
                       {needsAction && !isPanelOpen && (
                         <button onClick={() => setSelected(c)}
                           style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"6px", padding:"5px 10px", fontSize:"12px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
-                          Send â†’
+                          Send →
                         </button>
                       )}
-                      {c.converted && <span style={{ fontSize:"11px", color:"#059669", fontWeight:600 }}>âœ… {c.orderId}</span>}
+                      {c.converted && <span style={{ fontSize:"11px", color:"#059669", fontWeight:600 }}>✅ {c.orderId}</span>}
                     </div>
                   </div>
                 );

@@ -8,10 +8,10 @@ import { loadAppState, saveAppState } from "./core/app-state-client";
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
 
-const NAV = [["â–¦","Dashboard"],["â‰¡","Orders"],["ðŸ“¦","Batches"],["â³","Pre-Orders"],["â¬¡","Products"],["â—‰","Customers"],["âŠ¡","Abandoned"],["â—ˆ","Coupons"],["$","Remittance"],["âŒ—","Analytics"],["âš™","Settings"]];
-const AGENT_NAV = [["â–¦","Dashboard"],["â‰¡","Orders"],["â¬¡","Products"],["â—‰","Customers"],["+","New Order"],["ðŸ‘¤","Profile"]];
+const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const AGENT_NAV = [["▦","Dashboard"],["≡","Orders"],["⬡","Products"],["◉","Customers"],["+","New Order"],["👤","Profile"]];
 
-const SRC_ICON = { facebook:"ðŸ“˜", instagram:"ðŸ“¸", whatsapp:"ðŸ’¬", phone:"ðŸ“ž", website:"ðŸŒ", "walk-in":"ðŸª" };
+const SRC_ICON = { facebook:"📘", instagram:"📸", whatsapp:"💬", phone:"📞", website:"🌐", "walk-in":"🏪" };
 const SRC_COLOR = { facebook:"#1877F2", instagram:"#E1306C", whatsapp:"#25D366", phone:"#64748B", website:"#6366F1", "walk-in":"#D97706" };
 
 type Theme = typeof DARK;
@@ -47,15 +47,15 @@ type Customer = {
 };
 
 const TAG_META: Record<string, { bg: string; color: string; icon: string }> = {
-  "VIP":               { bg:"#F59E0B15", color:"#D97706", icon:"â˜…" },
-  "Top Spender":       { bg:"#EF444415", color:"#DC2626", icon:"â–²" },
-  "Repeat":            { bg:"#10B98115", color:"#059669", icon:"â†»" },
-  "Regular":           { bg:"#6366F115", color:"#6366F1", icon:"â€¢" },
-  "New":               { bg:"#0D948815", color:"#0D9488", icon:"âœ¦" },
-  "Pre-Order Regular": { bg:"#A855F715", color:"#A855F7", icon:"â³" },
-  "High Risk":         { bg:"#EF444415", color:"#DC2626", icon:"âš " },
+  "VIP":               { bg:"#F59E0B15", color:"#D97706", icon:"★" },
+  "Top Spender":       { bg:"#EF444415", color:"#DC2626", icon:"▲" },
+  "Repeat":            { bg:"#10B98115", color:"#059669", icon:"↻" },
+  "Regular":           { bg:"#6366F115", color:"#6366F1", icon:"•" },
+  "New":               { bg:"#0D948815", color:"#0D9488", icon:"✦" },
+  "Pre-Order Regular": { bg:"#A855F715", color:"#A855F7", icon:"⏳" },
+  "High Risk":         { bg:"#EF444415", color:"#DC2626", icon:"⚠" },
   "Issue":             { bg:"#F59E0B20", color:"#D97706", icon:"!" },
-  "Blacklisted":       { bg:"#64748B20", color:"#64748B", icon:"â›”" },
+  "Blacklisted":       { bg:"#64748B20", color:"#64748B", icon:"⛔" },
 };
 
 const ORDER_STATUS_COLOR: Record<string, string> = {
@@ -64,14 +64,14 @@ const ORDER_STATUS_COLOR: Record<string, string> = {
   "Returned":"#DC2626","Cancelled":"#64748B",
 };
 
-// â”€â”€ SUB-COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 
 function SL({ c, T }: { c: string; T: Theme }) {
   return <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"5px" }}>{c}</div>;
 }
 
 function Tag({ label }: { label: string }) {
-  const meta = TAG_META[label] || { bg:"#64748B15", color:"#64748B", icon:"â€¢" };
+  const meta = TAG_META[label] || { bg:"#64748B15", color:"#64748B", icon:"•" };
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:"4px", fontSize:"10px", fontWeight:700, padding:"2px 7px", borderRadius:"4px", background:meta.bg, color:meta.color }}>
       <span style={{ fontSize:"9px", lineHeight:1 }}>{meta.icon}</span>
@@ -101,7 +101,7 @@ function Avatar({ name, size }: { name: string; size?: number; T?: Theme }) {
   );
 }
 
-// â”€â”€ CUSTOMER PROFILE PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CUSTOMER PROFILE PANEL ────────────────────────────────────────────────
 function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; onClose: () => void; onUpdate: (updated: Customer) => void; T: Theme }) {
   const [note,        setNote]        = useState(customer.note);
   const [blacklisted, setBlacklisted] = useState(customer.blacklisted);
@@ -117,8 +117,8 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
   const IS: CSSProperties = { background:T.input, border:`1.5px solid ${T.ib}`, borderRadius:"8px", color:T.text, padding:"9px 12px", fontSize:"12px", outline:"none", width:"100%", boxSizing:"border-box", resize:"vertical", fontFamily:"inherit", minHeight:"70px" };
 
   const toggles: Array<[string, boolean, Dispatch<SetStateAction<boolean>>, string, string]> = [
-    ["âš ï¸ Mark as Fraud / High Risk", fraud, setFraud, "#DC2626", "Account will be flagged â€” orders require extra verification"],
-    ["ðŸš« Blacklist Customer", blacklisted, setBlacklisted, "#64748B", "Blacklisted customers cannot place new orders"],
+    ["⚠️ Mark as Fraud / High Risk", fraud, setFraud, "#DC2626", "Account will be flagged — orders require extra verification"],
+    ["🚫 Blacklist Customer", blacklisted, setBlacklisted, "#64748B", "Blacklisted customers cannot place new orders"],
   ];
 
   return (
@@ -127,7 +127,7 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
       {/* Header */}
       <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", flexShrink:0 }}>
         <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Customer Profile</span>
-        <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer", fontSize:"12px" }}>âœ•</button>
+        <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 9px", cursor:"pointer", fontSize:"12px" }}>✕</button>
       </div>
 
       <div style={{ flex:1, overflow:"auto", padding:"18px" }}>
@@ -137,7 +137,7 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
           <Avatar name={customer.name} size={52} T={T}/>
           <div>
             <div style={{ fontSize:"16px", fontWeight:800, color:T.text, marginBottom:"3px" }}>{customer.name}</div>
-            <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"5px" }}>ðŸ“ž {customer.phone}</div>
+            <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"5px" }}>📞 {customer.phone}</div>
             <div style={{ display:"flex", gap:"5px", flexWrap:"wrap" }}>
               {customer.tags.map(t => <Tag key={t} label={t}/>)}
             </div>
@@ -148,10 +148,10 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
         <div style={{ background:T.bg, borderRadius:"10px", padding:"12px 14px", marginBottom:"14px" }}>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"8px" }}>
             {[
-              ["ðŸ“ Area",       customer.area],
-              ["ðŸ“… Joined",     customer.joinedAt],
-              ["ðŸ›ï¸ Last Order", customer.lastOrderNum + " Â· " + customer.lastOrderAt],
-              ["ðŸ“£ First Source", (SRC_ICON[customer.firstSrc]||"") + " " + customer.firstSrc.charAt(0).toUpperCase() + customer.firstSrc.slice(1)],
+              ["📍 Area",       customer.area],
+              ["📅 Joined",     customer.joinedAt],
+              ["🛍️ Last Order", customer.lastOrderNum + " · " + customer.lastOrderAt],
+              ["📣 First Source", (SRC_ICON[customer.firstSrc]||"") + " " + customer.firstSrc.charAt(0).toUpperCase() + customer.firstSrc.slice(1)],
             ].map(([label, val]) => (
               <div key={label}>
                 <div style={{ fontSize:"10px", color:T.textMuted, marginBottom:"2px" }}>{label}</div>
@@ -164,11 +164,11 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
         {/* Stats */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"7px", marginBottom:"14px" }}>
           <StatMini label="Total Orders"   value={customer.totalOrders}                       color={T.accent}  T={T}/>
-          <StatMini label="Total Spent"    value={"à§³"+customer.totalSpent.toLocaleString()}   color="#059669"   T={T}/>
-          <StatMini label="COD Collected"  value={"à§³"+customer.codCollected.toLocaleString()} color="#0D9488"   T={T}/>
-          <StatMini label="Advance Paid"   value={"à§³"+customer.advancePaid.toLocaleString()}  color="#6366F1"   T={T}/>
+          <StatMini label="Total Spent"    value={"৳"+customer.totalSpent.toLocaleString()}   color="#059669"   T={T}/>
+          <StatMini label="COD Collected"  value={"৳"+customer.codCollected.toLocaleString()} color="#0D9488"   T={T}/>
+          <StatMini label="Advance Paid"   value={"৳"+customer.advancePaid.toLocaleString()}  color="#6366F1"   T={T}/>
           <StatMini label="Return Count"   value={customer.returnCount}                        color={customer.returnCount>0?"#DC2626":T.textMid} T={T}/>
-          <StatMini label="Avg. Order"     value={"à§³"+(customer.totalOrders>0?Math.round(customer.totalSpent/customer.totalOrders).toLocaleString():0)} color="#D97706" T={T}/>
+          <StatMini label="Avg. Order"     value={"৳"+(customer.totalOrders>0?Math.round(customer.totalSpent/customer.totalOrders).toLocaleString():0)} color="#D97706" T={T}/>
         </div>
 
         {/* Flags */}
@@ -196,7 +196,7 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
         {/* Save */}
         <button onClick={save}
           style={{ width:"100%", background:saved?"#059669":T.accent, border:"none", color:"#fff", borderRadius:"9px", padding:"11px", fontSize:"13px", fontWeight:700, cursor:"pointer", marginBottom:"18px", transition:"background 0.2s" }}>
-          {saved ? "âœ“ Saved!" : "Save Changes"}
+          {saved ? "✓ Saved!" : "Save Changes"}
         </button>
 
         {/* Order history */}
@@ -217,7 +217,7 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
                     <div style={{ fontSize:"10px", color:T.textMuted }}>{o.date}</div>
                   </div>
                   <div style={{ textAlign:"right" }}>
-                    <div style={{ fontSize:"12px", fontWeight:700, color:T.text, marginBottom:"3px" }}>à§³{o.amount.toLocaleString()}</div>
+                    <div style={{ fontSize:"12px", fontWeight:700, color:T.text, marginBottom:"3px" }}>৳{o.amount.toLocaleString()}</div>
                     <span style={{ fontSize:"9px", fontWeight:700, padding:"2px 6px", borderRadius:"3px", background:sc+"18", color:sc }}>{o.status}</span>
                   </div>
                 </div>
@@ -231,7 +231,7 @@ function ProfilePanel({ customer, onClose, onUpdate, T }: { customer: Customer; 
   );
 }
 
-// â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN ──────────────────────────────────────────────────────────────────
 export default function CustomersPage() {
   const [dark, setDark]               = useState(false);
   const T = dark ? DARK : LIGHT;
@@ -308,7 +308,7 @@ export default function CustomersPage() {
     ["New (7 days)",   customers.filter(c => c.tags.includes("New")).length,       "#0D9488"],
     ["High Risk",      customers.filter(c => c.fraud).length,                      "#DC2626"],
     ["Blacklisted",    customers.filter(c => c.blacklisted).length,                "#64748B"],
-    ["Total Revenue",  "à§³"+customers.reduce((a,b)=>a+b.totalSpent,0).toLocaleString(), "#059669"],
+    ["Total Revenue",  "৳"+customers.reduce((a,b)=>a+b.totalSpent,0).toLocaleString(), "#059669"],
   ];
 
   return (
@@ -335,7 +335,7 @@ export default function CustomersPage() {
         {/* Topbar */}
         <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 18px", gap:"10px", flexShrink:0 }}>
           <div style={{ flex:1, position:"relative" }}>
-            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>ðŸ”</span>
+            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, phone or area..."
               style={{ width:"100%", background:T.bg, border:`1px solid ${T.border}`, borderRadius:"8px", padding:"7px 10px 7px 30px", color:T.text, fontSize:"12px", outline:"none", boxSizing:"border-box" }}/>
           </div>
@@ -403,7 +403,7 @@ export default function CustomersPage() {
                   <div style={{ paddingLeft:"10px" }}>
                     <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"2px" }}>
                       <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>{c.name}</span>
-                      {c.fraud       && <span style={{ fontSize:"9px", fontWeight:700, background:"#EF444415", color:"#DC2626", padding:"1px 5px", borderRadius:"3px" }}>âš  RISK</span>}
+                      {c.fraud       && <span style={{ fontSize:"9px", fontWeight:700, background:"#EF444415", color:"#DC2626", padding:"1px 5px", borderRadius:"3px" }}>⚠ RISK</span>}
                       {c.blacklisted && <span style={{ fontSize:"9px", fontWeight:700, background:"#64748B20", color:"#64748B", padding:"1px 5px", borderRadius:"3px" }}>BLOCKED</span>}
                     </div>
                     <div style={{ fontSize:"11px", color:T.textMuted }}>
@@ -413,8 +413,8 @@ export default function CustomersPage() {
 
                   <div style={{ fontSize:"12px", color:T.textMid, fontFamily:"monospace" }}>{c.phone}</div>
                   <div style={{ fontSize:"13px", fontWeight:700, color:T.accent }}>{c.totalOrders}</div>
-                  <div style={{ fontSize:"13px", fontWeight:700, color:"#059669" }}>à§³{c.totalSpent.toLocaleString()}</div>
-                  <div style={{ fontSize:"12px", color:T.textMid }}>à§³{c.codCollected.toLocaleString()}</div>
+                  <div style={{ fontSize:"13px", fontWeight:700, color:"#059669" }}>৳{c.totalSpent.toLocaleString()}</div>
+                  <div style={{ fontSize:"12px", color:T.textMid }}>৳{c.codCollected.toLocaleString()}</div>
                   <div>
                     <div style={{ fontSize:"11px", fontWeight:600, color:T.text }}>{c.lastOrderNum}</div>
                     <div style={{ fontSize:"10px", color:T.textMuted }}>{c.lastOrderAt}</div>

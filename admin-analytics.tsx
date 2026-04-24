@@ -131,6 +131,10 @@ export default function AnalyticsPage() {
     const s = String(status || "").toLowerCase();
     return s.includes("return") || s.includes("cancel");
   };
+  // Statuses that must not contribute to revenue / profit totals
+  const EXCLUDED_REVENUE_STATUSES = new Set(["Cancelled","Returned","Refunded","Return","Cancel","Refund"]);
+  const isRevenueEligible = (order: any) =>
+    !EXCLUDED_REVENUE_STATUSES.has(String(order?.status || ""));
 
   const monthBuckets = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
@@ -174,25 +178,30 @@ export default function AnalyticsPage() {
     const isCod = String(order?.pay || "").toLowerCase().includes("cod");
 
     if (!Number.isNaN(date.getTime())) {
+      const eligible = isRevenueEligible(order);
       const mKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
       const mb = monthMap.get(mKey);
       if (mb) {
-        mb.revenue += amount;
-        mb.profit += Math.round(amount * 0.3);
+        if (eligible) {
+          mb.revenue += amount;
+          mb.profit += Math.round(amount * 0.3);
+          mb.cod += isCod ? amount : 0;
+        }
         mb.orders += 1;
         mb.returns += isReturn ? 1 : 0;
-        mb.cod += isCod ? amount : 0;
       }
 
       const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
       if (diffDays >= 0 && diffDays < 28) {
         const idx = 3 - Math.floor(diffDays / 7);
         if (weekBuckets[idx]) {
-          weekBuckets[idx].revenue += amount;
-          weekBuckets[idx].profit += Math.round(amount * 0.3);
+          if (eligible) {
+            weekBuckets[idx].revenue += amount;
+            weekBuckets[idx].profit += Math.round(amount * 0.3);
+            weekBuckets[idx].cod += isCod ? amount : 0;
+          }
           weekBuckets[idx].orders += 1;
           weekBuckets[idx].returns += isReturn ? 1 : 0;
-          weekBuckets[idx].cod += isCod ? amount : 0;
         }
       }
     }
@@ -205,16 +214,17 @@ export default function AnalyticsPage() {
       sourceRaw === "whatsapp" ? { name: "WhatsApp", icon: "💬", color: "#25D366" } :
       sourceRaw === "phone" ? { name: "Phone", icon: "📞", color: "#64748B" } :
       { name: "Other", icon: "📦", color: "#D97706" };
+    const eligible = isRevenueEligible(order);
     const src = sourceMap.get(sourceMeta.name) || { ...sourceMeta, orders: 0, revenue: 0 };
     src.orders += 1;
-    src.revenue += amount;
+    if (eligible) src.revenue += amount;
     sourceMap.set(sourceMeta.name, src);
 
     const agentName = String(order?.agent || "Unassigned");
     const initials = agentName.split(" ").filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase() || "").join("") || "UA";
     const agent = agentMap.get(agentName) || { name: agentName, avatar: initials, color: "#6366F1", orders: 0, revenue: 0, delivered: 0, cancelled: 0, returns: 0, avgTime: "-" };
     agent.orders += 1;
-    agent.revenue += amount;
+    if (eligible) agent.revenue += amount;
     if (String(status).toLowerCase() === "delivered") agent.delivered += 1;
     if (String(status).toLowerCase().includes("cancel")) agent.cancelled += 1;
     if (isReturn) agent.returns += 1;
@@ -224,10 +234,10 @@ export default function AnalyticsPage() {
     const isInside = area.includes("dhaka") || area.includes("inside");
     if (isInside) {
       insideOrders += 1;
-      insideRevenue += amount;
+      if (eligible) insideRevenue += amount;
     } else {
       outsideOrders += 1;
-      outsideRevenue += amount;
+      if (eligible) outsideRevenue += amount;
     }
 
     const items = Array.isArray(order?.items) ? order.items : [];
@@ -241,8 +251,10 @@ export default function AnalyticsPage() {
 
       const p = productMap.get(name) || { name, cat, orders: 0, revenue: 0, profit: 0, returnCount: 0, topVar: {} };
       p.orders += qty;
-      p.revenue += lineRevenue;
-      p.profit += Math.round(lineRevenue * 0.3);
+      if (eligible) {
+        p.revenue += lineRevenue;
+        p.profit += Math.round(lineRevenue * 0.3);
+      }
       p.returnCount += isReturn ? 1 : 0;
       p.topVar[varKey] = (p.topVar[varKey] || 0) + qty;
       productMap.set(name, p);
@@ -250,8 +262,10 @@ export default function AnalyticsPage() {
       const color = cat === "Bags" ? "#6366F1" : cat === "Shoes" ? "#D97706" : "#0D9488";
       const c = categoryMap.get(cat) || { name: cat, orders: 0, revenue: 0, profit: 0, color };
       c.orders += qty;
-      c.revenue += lineRevenue;
-      c.profit += Math.round(lineRevenue * 0.3);
+      if (eligible) {
+        c.revenue += lineRevenue;
+        c.profit += Math.round(lineRevenue * 0.3);
+      }
       categoryMap.set(cat, c);
     });
   });

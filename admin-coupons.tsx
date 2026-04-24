@@ -7,7 +7,7 @@ import { loadAppState, saveAppState } from "./core/app-state-client";
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", ib:"rgba(255,255,255,0.09)", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)", rowHover:"rgba(255,255,255,0.03)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", ib:"rgba(0,0,0,0.1)", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)", rowHover:"rgba(0,0,0,0.025)" };
 
-const NAV = [["â–¦","Dashboard"],["â‰¡","Orders"],["ðŸ“¦","Batches"],["â³","Pre-Orders"],["â¬¡","Products"],["â—‰","Customers"],["âŠ¡","Abandoned"],["â—ˆ","Coupons"],["$","Remittance"],["âŒ—","Analytics"],["âš™","Settings"]];
+const NAV = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -21,10 +21,10 @@ const couponStatus = (c) => {
 const discLabel = (c) => {
   if (c.type === "free_ship") return "Free Shipping";
   if (c.type === "pct")  return `${c.value}% off`;
-  return `à§³${c.value} off`;
+  return `৳${c.value} off`;
 };
 
-// â”€â”€ SUB-COMPONENTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── SUB-COMPONENTS ────────────────────────────────────────────────────────
 
 function SL({ c, T, req, sub }) {
   return (
@@ -71,7 +71,7 @@ function Toggle({ val, set, label, sub, T }) {
 
 // Usage progress bar
 function UsageBar({ used, max, T }) {
-  if (!max) return <span style={{ fontSize:"11px", color:T.textMuted }}>âˆž unlimited</span>;
+  if (!max) return <span style={{ fontSize:"11px", color:T.textMuted }}>∞ unlimited</span>;
   const pct = Math.min(100, Math.round(used / max * 100));
   const color = pct >= 100 ? "#DC2626" : pct >= 80 ? "#D97706" : "#059669";
   return (
@@ -105,10 +105,10 @@ function CouponCard({ coupon, onEdit, onToggle, onDelete, T }) {
 
         {/* Discount type */}
         <div style={{ display:"flex", alignItems:"center", gap:"7px", marginBottom:"8px" }}>
-          <span style={{ fontSize:"20px" }}>{coupon.type==="free_ship"?"ðŸšš":coupon.type==="pct"?"%":"à§³"}</span>
+          <span style={{ fontSize:"20px" }}>{coupon.type==="free_ship"?"🚚":coupon.type==="pct"?"%":"৳"}</span>
           <div>
             <div style={{ fontSize:"15px", fontWeight:800, color:coupon.type==="free_ship"?"#0D9488":coupon.type==="pct"?"#6366F1":"#D97706" }}>{discLabel(coupon)}</div>
-            {coupon.minOrder > 0 && <div style={{ fontSize:"10px", color:T.textMuted }}>Min. order à§³{coupon.minOrder.toLocaleString()}</div>}
+            {coupon.minOrder > 0 && <div style={{ fontSize:"10px", color:T.textMuted }}>Min. order ৳{coupon.minOrder.toLocaleString()}</div>}
           </div>
         </div>
 
@@ -132,15 +132,15 @@ function CouponCard({ coupon, onEdit, onToggle, onDelete, T }) {
         <div style={{ display:"flex", gap:"6px" }}>
           <button onClick={() => onEdit(coupon)}
             style={{ flex:1, background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"7px", padding:"7px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>
-            âœ Edit
+            ✏ Edit
           </button>
           <button onClick={() => onToggle(coupon.id)}
             style={{ flex:1, background:isActive?"#F59E0B15":"#10B98115", border:`1px solid ${isActive?"#F59E0B30":"#10B98130"}`, color:isActive?"#D97706":"#059669", borderRadius:"7px", padding:"7px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>
-            {isActive ? "â¸ Pause" : "â–¶ Activate"}
+            {isActive ? "⏸ Pause" : "▶ Activate"}
           </button>
           <button onClick={() => onDelete(coupon.id)}
             style={{ background:"#EF444412", border:"1px solid #EF444425", color:"#DC2626", borderRadius:"7px", padding:"7px 9px", fontSize:"11px", cursor:"pointer" }}>
-            ðŸ—‘
+            🗑
           </button>
         </div>
       </div>
@@ -159,21 +159,21 @@ function CouponRow({ coupon, onEdit, onToggle, onDelete, T }) {
       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
       <div style={{ fontFamily:"monospace", fontSize:"13px", fontWeight:800, color:T.text }}>{coupon.code}</div>
       <div style={{ fontSize:"13px", fontWeight:700, color:coupon.type==="free_ship"?"#0D9488":coupon.type==="pct"?"#6366F1":"#D97706" }}>{discLabel(coupon)}</div>
-      <div style={{ fontSize:"12px", color:T.textMuted }}>{coupon.minOrder > 0 ? `Min à§³${coupon.minOrder.toLocaleString()}` : "No minimum"}</div>
+      <div style={{ fontSize:"12px", color:T.textMuted }}>{coupon.minOrder > 0 ? `Min ৳${coupon.minOrder.toLocaleString()}` : "No minimum"}</div>
       <div><UsageBar used={coupon.usedCount} max={coupon.maxUses} T={T}/></div>
-      <div style={{ fontSize:"11px", color:T.textMuted }}>{coupon.expiresAt || "â€”"}</div>
+      <div style={{ fontSize:"11px", color:T.textMuted }}>{coupon.expiresAt || "—"}</div>
       <div><span style={{ fontSize:"12px", fontWeight:700, padding:"2px 8px", borderRadius:"4px", background:bgColor, color:textColor, textTransform:"uppercase" }}>{statusKey}</span></div>
       <div style={{ fontSize:"11px", color:T.textMuted, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{coupon.description}</div>
       <div style={{ display:"flex", gap:"5px" }}>
         <button onClick={() => onEdit(coupon)} style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"5px", padding:"4px 8px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>Edit</button>
         <button onClick={() => onToggle(coupon.id)} style={{ background:isActive?"#F59E0B15":"#10B98115", border:`1px solid ${isActive?"#F59E0B30":"#10B98130"}`, color:isActive?"#D97706":"#059669", borderRadius:"5px", padding:"4px 8px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>{isActive?"Pause":"On"}</button>
-        <button onClick={() => onDelete(coupon.id)} style={{ background:"#EF444412", border:"1px solid #EF444425", color:"#DC2626", borderRadius:"5px", padding:"4px 7px", fontSize:"10px", cursor:"pointer" }}>ðŸ—‘</button>
+        <button onClick={() => onDelete(coupon.id)} style={{ background:"#EF444412", border:"1px solid #EF444425", color:"#DC2626", borderRadius:"5px", padding:"4px 7px", fontSize:"10px", cursor:"pointer" }}>🗑</button>
       </div>
     </div>
   );
 }
 
-// â”€â”€ COUPON FORM MODAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── COUPON FORM MODAL ─────────────────────────────────────────────────────
 function CouponModal({ coupon, onSave, onClose, T }) {
   const isNew = !coupon.id;
   const [code,         setCode]         = useState(coupon.code||"");
@@ -211,8 +211,8 @@ function CouponModal({ coupon, onSave, onClose, T }) {
   const IS = { background:T.input, border:`1.5px solid ${T.ib}`, borderRadius:"8px", color:T.text, padding:"9px 12px", fontSize:"12px", outline:"none", width:"100%", boxSizing:"border-box", fontFamily:"inherit" };
 
   // Live preview
-  const previewDisc = type==="free_ship" ? "Free Shipping" : type==="pct" ? `${value||0}% off` : `à§³${value||0} off`;
-  const previewMin  = minOrder > 0 ? ` on orders above à§³${minOrder}` : "";
+  const previewDisc = type==="free_ship" ? "Free Shipping" : type==="pct" ? `${value||0}% off` : `৳${value||0} off`;
+  const previewMin  = minOrder > 0 ? ` on orders above ৳${minOrder}` : "";
 
   return (
     <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
@@ -221,8 +221,8 @@ function CouponModal({ coupon, onSave, onClose, T }) {
 
         {/* Header */}
         <div style={{ padding:"14px 20px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", position:"sticky", top:0, background:T.surface, zIndex:2 }}>
-          <span style={{ fontSize:"14px", fontWeight:800, color:T.text }}>{isNew ? "Create New Coupon" : `Edit â€” ${coupon.code}`}</span>
-          <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"3px 9px", cursor:"pointer" }}>âœ•</button>
+          <span style={{ fontSize:"14px", fontWeight:800, color:T.text }}>{isNew ? "Create New Coupon" : `Edit — ${coupon.code}`}</span>
+          <button onClick={onClose} style={{ background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"3px 9px", cursor:"pointer" }}>✕</button>
         </div>
 
         <div style={{ padding:"20px", display:"flex", flexDirection:"column", gap:"16px" }}>
@@ -235,7 +235,7 @@ function CouponModal({ coupon, onSave, onClose, T }) {
                 style={{ ...IS, fontFamily:"monospace", fontSize:"15px", fontWeight:800, letterSpacing:"1.5px", flex:1 }}/>
               <button onClick={genCode}
                 style={{ background:T.accent+"15", border:`1px solid ${T.accent}30`, color:T.accent, borderRadius:"8px", padding:"9px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
-                âš¡ Generate
+                ⚡ Generate
               </button>
             </div>
           </div>
@@ -246,8 +246,8 @@ function CouponModal({ coupon, onSave, onClose, T }) {
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px" }}>
               {[
                 ["pct",       "%",  "Percentage off",    "#6366F1"],
-                ["flat",      "à§³",  "Flat amount off",   "#D97706"],
-                ["free_ship", "ðŸšš", "Free shipping",     "#0D9488"],
+                ["flat",      "৳",  "Flat amount off",   "#D97706"],
+                ["free_ship", "🚚", "Free shipping",     "#0D9488"],
               ].map(([id, icon, label, color]) => (
                 <div key={id} onClick={() => { setType(id); if(id==="free_ship") setFreeShip(true); else setFreeShip(false); }}
                   style={{ padding:"12px", borderRadius:"9px", border:`2px solid ${type===id?color:T.border}`, background:type===id?color+"12":T.bg, cursor:"pointer", textAlign:"center", transition:"all 0.12s" }}>
@@ -264,7 +264,7 @@ function CouponModal({ coupon, onSave, onClose, T }) {
               <SL c={type==="pct" ? "Discount Percentage (%)" : "Discount Amount (BDT)"} T={T} req/>
               <Inp value={value} onChange={e => setValue(e.target.value)} placeholder={type==="pct"?"e.g. 20":"e.g. 100"} T={T} type="number"/>
               {value > 0 && type === "pct" && value > 100 && (
-                <div style={{ fontSize:"11px", color:"#DC2626", marginTop:"4px" }}>âš  Percentage can't exceed 100%</div>
+                <div style={{ fontSize:"11px", color:"#DC2626", marginTop:"4px" }}>⚠ Percentage can't exceed 100%</div>
               )}
             </div>
           )}
@@ -273,18 +273,18 @@ function CouponModal({ coupon, onSave, onClose, T }) {
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
             <div>
               <SL c="Minimum Order Amount (BDT)" T={T} sub="Leave 0 for no minimum"/>
-              <Inp value={minOrder} onChange={e => setMinOrder(e.target.value)} placeholder="0 â€” no minimum" T={T} type="number"/>
+              <Inp value={minOrder} onChange={e => setMinOrder(e.target.value)} placeholder="0 — no minimum" T={T} type="number"/>
             </div>
             <div>
               <SL c="Maximum Uses" T={T} sub="Leave 0 for unlimited uses"/>
-              <Inp value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="0 â€” unlimited" T={T} type="number"/>
+              <Inp value={maxUses} onChange={e => setMaxUses(e.target.value)} placeholder="0 — unlimited" T={T} type="number"/>
             </div>
           </div>
 
           {/* Expiry */}
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
             <div>
-              <SL c="Expiry Date" T={T} sub="Leave empty â€” coupon never expires"/>
+              <SL c="Expiry Date" T={T} sub="Leave empty — coupon never expires"/>
               <input type="date" value={expiresAt} onChange={e => setExpiresAt(e.target.value)} min={today}
                 style={{ ...IS }}/>
             </div>
@@ -318,17 +318,17 @@ function CouponModal({ coupon, onSave, onClose, T }) {
           {/* Live preview */}
           {code && (
             <div style={{ background:T.accent+"0A", border:`1px solid ${T.accent}25`, borderRadius:"10px", padding:"14px" }}>
-              <div style={{ fontSize:"10px", color:T.accent, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"10px" }}>Live Preview â€” how this coupon appears</div>
+              <div style={{ fontSize:"10px", color:T.accent, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.5px", marginBottom:"10px" }}>Live Preview — how this coupon appears</div>
               <div style={{ display:"flex", gap:"10px", alignItems:"center", flexWrap:"wrap" }}>
                 <div style={{ fontFamily:"monospace", fontSize:"18px", fontWeight:800, color:T.text, background:T.bg, padding:"8px 14px", borderRadius:"8px", border:`2px dashed ${T.accent}40`, letterSpacing:"2px" }}>{code}</div>
                 <div>
                   <div style={{ fontSize:"15px", fontWeight:800, color:type==="free_ship"?"#0D9488":type==="pct"?"#6366F1":"#D97706" }}>{previewDisc}{previewMin}</div>
                   <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"2px", display:"flex", gap:"6px", flexWrap:"wrap" }}>
-                    {singleUse && <span>Â· Single use</span>}
+                    {singleUse && <span>· Single use</span>}
                     {freeShip && type!=="free_ship" && <span style={{ color:"#0D9488" }}>+ Free shipping</span>}
-                    {maxUses > 0 && <span>Â· Max {maxUses} uses</span>}
-                    {expiresAt && <span>Â· Expires {expiresAt}</span>}
-                    {applicableTo !== "all" && <span style={{ color:"#D97706" }}>Â· {applicableTo} only</span>}
+                    {maxUses > 0 && <span>· Max {maxUses} uses</span>}
+                    {expiresAt && <span>· Expires {expiresAt}</span>}
+                    {applicableTo !== "all" && <span style={{ color:"#D97706" }}>· {applicableTo} only</span>}
                   </div>
                 </div>
               </div>
@@ -340,7 +340,7 @@ function CouponModal({ coupon, onSave, onClose, T }) {
             <button onClick={onClose} style={{ flex:1, background:T.bg, border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"12px", fontWeight:600, cursor:"pointer" }}>Cancel</button>
             <button onClick={handleSave} disabled={!canSave}
               style={{ flex:2, background:canSave?T.accent:"transparent", border:`1px solid ${canSave?T.accent:T.border}`, color:canSave?"#fff":T.textMuted, borderRadius:"9px", padding:"10px", fontSize:"13px", fontWeight:700, cursor:canSave?"pointer":"not-allowed" }}>
-              {isNew ? "âœ“ Create Coupon" : "âœ“ Save Changes"}
+              {isNew ? "✓ Create Coupon" : "✓ Save Changes"}
             </button>
           </div>
         </div>
@@ -349,7 +349,7 @@ function CouponModal({ coupon, onSave, onClose, T }) {
   );
 }
 
-// â”€â”€ MAIN â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── MAIN ──────────────────────────────────────────────────────────────────
 export default function CouponsPage() {
   const [dark, setDark]         = useState(false);
   const T = dark ? DARK : LIGHT;
@@ -493,13 +493,13 @@ export default function CouponsPage() {
         {/* Topbar */}
         <div style={{ height:"52px", background:T.sidebar, borderBottom:`1px solid ${T.border}`, display:"flex", alignItems:"center", padding:"0 18px", gap:"10px", flexShrink:0 }}>
           <div style={{ flex:1, position:"relative" }}>
-            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>ðŸ”</span>
+            <span style={{ position:"absolute", left:"10px", top:"50%", transform:"translateY(-50%)", color:T.textMuted, fontSize:"12px" }}>🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search coupon code or description..."
               style={{ width:"100%", background:T.bg, border:`1px solid ${T.border}`, borderRadius:"8px", padding:"7px 10px 7px 30px", color:T.text, fontSize:"12px", outline:"none", boxSizing:"border-box" }}/>
           </div>
           {/* View toggle */}
           <div style={{ display:"flex", gap:"2px", background:T.bg, borderRadius:"8px", padding:"3px", border:`1px solid ${T.border}` }}>
-            {[["grid","âŠž Grid"],["table","â‰¡ Table"]].map(([id, label]) => (
+            {[["grid","⊞ Grid"],["table","≡ Table"]].map(([id, label]) => (
               <button key={id} onClick={() => setViewMode(id)} style={{ padding:"5px 11px", borderRadius:"6px", border:"none", cursor:"pointer", fontSize:"11px", fontWeight:600, background:viewMode===id?T.accent+"18":"transparent", color:viewMode===id?T.accent:T.textMuted }}>{label}</button>
             ))}
           </div>
@@ -593,7 +593,7 @@ export default function CouponsPage() {
         <div style={{ position:"fixed", inset:0, zIndex:200, display:"flex", alignItems:"center", justifyContent:"center" }}>
           <div style={{ position:"absolute", inset:0, background:"rgba(0,0,0,0.5)" }} onClick={() => setDelId(null)}/>
           <div style={{ position:"relative", background:T.surface, border:`1px solid ${T.border}`, borderRadius:"14px", padding:"28px", maxWidth:"360px", width:"90%", textAlign:"center", zIndex:1 }}>
-            <div style={{ fontSize:"32px", marginBottom:"10px" }}>ðŸ—‘</div>
+            <div style={{ fontSize:"32px", marginBottom:"10px" }}>🗑</div>
             <div style={{ fontSize:"15px", fontWeight:800, color:T.text, marginBottom:"6px" }}>Delete this coupon?</div>
             <div style={{ fontSize:"12px", color:T.textMuted, marginBottom:"20px", lineHeight:"1.6" }}>
               Code: <strong style={{ fontFamily:"monospace", color:T.text }}>{coupons.find(c => c.id === delId)?.code}</strong><br/>
