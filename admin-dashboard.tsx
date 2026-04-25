@@ -4,6 +4,7 @@ import { getRouteForLabel, navigateByAdminNavLabel } from "./core/nav-routes";
 import { loadSession } from "./core/auth-session";
 import { appendTimelineEvent, loadOrderCollection, persistOrderCollectionToServer, syncOrderCollectionFromServer } from "./core/order-store";
 import AdminSidebar from "./core/admin-sidebar";
+import { loadAppState } from "./core/app-state-client";
 
 const DARK  = { bg:"#0D0F14", surface:"#161820", sidebar:"#111318", border:"rgba(255,255,255,0.07)", text:"#E2E8F0", textMid:"#94A3B8", textMuted:"#475569", input:"#0D0F14", accent:"#6366F1", tHead:"rgba(255,255,255,0.025)" };
 const LIGHT = { bg:"#F1F5F9", surface:"#FFFFFF", sidebar:"#FFFFFF", border:"rgba(0,0,0,0.08)", text:"#0F172A", textMid:"#334155", textMuted:"#64748B", input:"#F8FAFC", accent:"#6366F1", tHead:"rgba(0,0,0,0.03)" };
@@ -118,7 +119,7 @@ type BarChartProps = {
   T: Theme;
 };
 
-const NAV: Array<[string, string]> = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
+const NAV: Array<[string, string]> = [["▦","Dashboard"],["≡","Orders"],["📦","Batches"],["⏳","Pre-Orders"],["⬡","Products"],["🗂️","Categories"],["◉","Customers"],["⊡","Abandoned"],["◈","Coupons"],["$","Remittance"],["⌗","Analytics"],["⚙","Settings"]];
 
 const VIEW_ORDER_KEY = "shopadmin.viewOrder.num";
 
@@ -128,8 +129,7 @@ function Sidebar({ dark, setDark, nav, setNav, T, issueCount, user }: SidebarPro
   return (
     <div style={{ width:"236px", background:T.sidebar, borderRight:`1px solid ${T.border}`, display:"flex", flexDirection:"column", flexShrink:0 }}>
       <div style={{ padding:"18px 15px 13px", borderBottom:`1px solid ${T.border}` }}>
-        <div style={{ fontSize:"17px", fontWeight:800, color:T.accent, letterSpacing:"0.2px" }}>ShopAdmin</div>
-        <div style={{ fontSize:"10px", color:T.textMuted, marginTop:"2px", fontWeight:600 }}>LADIES FASHION BD</div>
+        <div style={{ fontSize:"17px", fontWeight:800, color:T.accent, letterSpacing:"0.2px" }}>{""}</div>
       </div>
       <div style={{ padding:"10px 8px", flex:1 }}>
         {NAV.map(([icon, label], i) => {
@@ -182,27 +182,28 @@ function Sidebar({ dark, setDark, nav, setNav, T, issueCount, user }: SidebarPro
 }
 
 function StatCard({ label, value, sub, color, icon, T }: StatCardProps) {
+  const iconBg = color + "18";
   return (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", padding:"14px 16px" }}>
-      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
-        <div style={{ fontSize:"10px", color:T.textMuted, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.4px" }}>{label}</div>
-        <span style={{ fontSize:"18px" }}>{icon}</span>
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"16px", padding:"18px 16px", boxShadow:"0 2px 12px rgba(0,0,0,0.05)", display:"flex", flexDirection:"column", gap:"10px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+        <div style={{ fontSize:"11px", color:T.textMuted, fontWeight:600, textTransform:"uppercase", letterSpacing:"0.5px", lineHeight:1.3 }}>{label}</div>
+        <div style={{ width:"38px", height:"38px", borderRadius:"10px", background:iconBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px", flexShrink:0 }}>{icon}</div>
       </div>
-      <div style={{ fontSize:"22px", fontWeight:800, color, marginBottom:"3px", letterSpacing:"-0.5px" }}>{value}</div>
-      {sub && <div style={{ fontSize:"11px", color:T.textMuted }}>{sub}</div>}
+      <div style={{ fontSize:"28px", fontWeight:800, color, letterSpacing:"-1px", lineHeight:1 }}>{value}</div>
+      {sub && <div style={{ fontSize:"11px", color:T.textMuted, marginTop:"-4px" }}>{sub}</div>}
     </div>
   );
 }
 
 function CardWrap({ title, badge, badgeColor, action, actionOnClick, children, T }: CardWrapProps) {
   return (
-    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", overflow:"hidden" }}>
-      <div style={{ padding:"12px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+    <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"16px", overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.05)" }}>
+      <div style={{ padding:"14px 18px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-          <span style={{ fontSize:"13px", fontWeight:700, color:T.text }}>{title}</span>
-          {badge !== undefined && <span style={{ fontSize:"10px", fontWeight:800, padding:"1px 7px", borderRadius:"10px", background:(badgeColor || T.accent)+"20", color:(badgeColor || T.accent) }}>{badge}</span>}
+          <span style={{ fontSize:"14px", fontWeight:700, color:T.text }}>{title}</span>
+          {badge !== undefined && <span style={{ fontSize:"10px", fontWeight:800, padding:"2px 8px", borderRadius:"20px", background:(badgeColor || T.accent)+"18", color:(badgeColor || T.accent) }}>{badge}</span>}
         </div>
-        {action && <button onClick={actionOnClick} style={{ background:"transparent", border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"4px 11px", fontSize:"11px", cursor:"pointer" }}>{action}</button>}
+        {action && <button onClick={actionOnClick} style={{ background:T.accent+"12", border:"none", color:T.accent, borderRadius:"8px", padding:"5px 12px", fontSize:"11px", fontWeight:700, cursor:"pointer" }}>{action}</button>}
       </div>
       {children}
     </div>
@@ -250,11 +251,15 @@ export default function Dashboard() {
   const [quickRange, setQuickRange] = useState("7d");
   const [orders, setOrders] = useState(() => loadOrderCollection([]));
   const [ordersHydrated, setOrdersHydrated] = useState(false);
+  const [delIn,  setDelIn]  = useState(80);
+  const [delOut, setDelOut] = useState(150);
 
   const calcOrderAmount = (order: any) => {
     const items = Array.isArray(order?.items) ? order.items : [];
     return items.reduce((sum: number, item: any) => sum + Number(item?.price || 0) * Number(item?.qty || 0), 0);
   };
+
+  const isDhaka = (area: string) => String(area || "").toLowerCase().includes("dhaka");
 
   // Exclude cancelled / returned / refunded orders from all revenue calculations
   const EXCLUDED_STATUSES = new Set(["Cancelled","Returned","Refunded","Return","Cancel","Refund"]);
@@ -381,10 +386,17 @@ export default function Dashboard() {
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
-      const synced = await syncOrderCollectionFromServer([]);
+      const [synced, deliverySettings] = await Promise.all([
+        syncOrderCollectionFromServer([]),
+        loadAppState("settings.delivery", { inDhaka: "80", outDhaka: "150" }),
+      ]);
       if (cancelled) return;
       setOrders(synced as any);
       setOrdersHydrated(true);
+      const parsedIn  = parseInt(String((deliverySettings as any).inDhaka  || ""), 10);
+      const parsedOut = parseInt(String((deliverySettings as any).outDhaka || ""), 10);
+      if (!isNaN(parsedIn)  && parsedIn  > 0) setDelIn(parsedIn);
+      if (!isNaN(parsedOut) && parsedOut > 0) setDelOut(parsedOut);
     };
     hydrate();
     return () => {
@@ -521,7 +533,16 @@ export default function Dashboard() {
   const todayOrders = REVENUE_BARS[REVENUE_BARS.length - 1]?.orders || 0;
   const totalCodDue = orders
     .filter((order: any) => isRevenueEligible(order))
-    .reduce((sum: number, order: any) => sum + Math.max(0, calcOrderAmount(order) - Number(order?.advance || 0)), 0);
+    .reduce((sum: number, order: any) => {
+      const subtotal = calcOrderAmount(order);
+      const disc = String(order?.discType) === "pct"
+        ? Math.round(subtotal * (Number(order?.discount) || 0) / 100)
+        : (Number(order?.discount) || 0);
+      const delivery = Number(order?.delivery) > 0
+        ? Number(order.delivery)
+        : isDhaka(order?.area) ? delIn : delOut;
+      return sum + Math.max(0, subtotal - disc + delivery - (Number(order?.advance) || 0));
+    }, 0);
 
   const STATS: StatItem[] = [
     { label:"Today's Revenue",   value:"৳"+todayRevenue.toLocaleString(),                  sub:`${todayOrders} orders today`,   color:"#6366F1", icon:"💰" },
@@ -548,27 +569,30 @@ export default function Dashboard() {
 
       <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
 
-        {/* Topbar with date filter */}
-        <div style={{ background:T.sidebar, borderBottom:`1px solid ${T.border}`, padding:"10px 20px", flexShrink:0 }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+        {/* Topbar */}
+        <div style={{ background:T.sidebar, borderBottom:`1px solid ${T.border}`, padding:"14px 24px", flexShrink:0 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+            {/* Welcome */}
             <div>
-              <div style={{ fontSize:"15px", fontWeight:800, color:T.text }}>Dashboard</div>
-              <div style={{ fontSize:"11px", color:T.textMuted }}>{new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "short", year: "numeric" })}</div>
+              <div style={{ fontSize:"22px", fontWeight:800, color:T.text, letterSpacing:"-0.3px" }}>
+                Welcome <span style={{ color:T.accent }}>{userInfo.name}!</span>
+              </div>
+              <div style={{ fontSize:"12px", color:T.textMuted, marginTop:"2px" }}>{new Date().toLocaleDateString("en-GB", { weekday:"long", day:"2-digit", month:"long", year:"numeric" })}</div>
             </div>
             <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
               {!isAgent && (
-                <button onClick={() => navigateByAdminNavLabel("Team")} style={{ background:T.bg, color:T.textMid, border:`1px solid ${T.border}`, borderRadius:"8px", padding:"7px 12px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>👥 Team</button>
+                <button onClick={() => navigateByAdminNavLabel("Team")} style={{ background:T.bg, color:T.textMid, border:`1px solid ${T.border}`, borderRadius:"10px", padding:"8px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>👥 Team</button>
               )}
-              <button onClick={() => navigateByAdminNavLabel("Profile")} style={{ background:T.bg, color:T.textMid, border:`1px solid ${T.border}`, borderRadius:"8px", padding:"7px 12px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>👤 Profile</button>
-              <button onClick={() => navigateByAdminNavLabel("New Order")} style={{ background:T.accent, color:"#fff", border:"none", borderRadius:"8px", padding:"7px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>+ New Order</button>
+              <button onClick={() => navigateByAdminNavLabel("Profile")} style={{ background:T.bg, color:T.textMid, border:`1px solid ${T.border}`, borderRadius:"10px", padding:"8px 14px", fontSize:"12px", fontWeight:700, cursor:"pointer" }}>👤 Profile</button>
+              <button onClick={() => navigateByAdminNavLabel("New Order")} style={{ background:T.accent, color:"#fff", border:"none", borderRadius:"10px", padding:"9px 18px", fontSize:"13px", fontWeight:700, cursor:"pointer", boxShadow:`0 4px 12px ${T.accent}40` }}>+ Create Order</button>
             </div>
           </div>
           {/* Date filter */}
           <div style={{ display:"flex", alignItems:"center", gap:"8px", flexWrap:"wrap" }}>
-            <div style={{ display:"flex", gap:"2px", background:T.bg, borderRadius:"8px", padding:"3px", border:`1px solid ${T.border}` }}>
+            <div style={{ display:"flex", gap:"2px", background:T.bg, borderRadius:"10px", padding:"3px", border:`1px solid ${T.border}` }}>
               {[["today","Today"],["7d","7 Days"],["30d","30 Days"],["month","This Month"],["custom","Custom"]].map(([id,label]) => (
                 <button key={id} onClick={() => applyRange(id)}
-                  style={{ padding:"5px 11px", borderRadius:"6px", border:"none", cursor:"pointer", fontSize:"11px", fontWeight:600, background:quickRange===id?T.accent+"20":"transparent", color:quickRange===id?T.accent:T.textMuted }}>
+                  style={{ padding:"6px 13px", borderRadius:"8px", border:"none", cursor:"pointer", fontSize:"11px", fontWeight:600, background:quickRange===id?T.accent:"transparent", color:quickRange===id?"#fff":T.textMuted, transition:"all 0.15s" }}>
                   {label}
                 </button>
               ))}
@@ -578,21 +602,20 @@ export default function Dashboard() {
             <input type="date" value={dateTo}   onChange={e => { setDateTo(e.target.value);   setQuickRange("custom"); }} style={IS}/>
             {(dateFrom || dateTo) && (
               <button onClick={() => { setDateFrom(""); setDateTo(""); setQuickRange("7d"); }}
-                style={{ background:"transparent", border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"6px", padding:"5px 10px", fontSize:"11px", cursor:"pointer" }}>✕</button>
+                style={{ background:"transparent", border:`1px solid ${T.border}`, color:T.textMuted, borderRadius:"8px", padding:"6px 10px", fontSize:"11px", cursor:"pointer" }}>✕ Clear</button>
             )}
-            {dateFrom && dateTo && <span style={{ fontSize:"11px", color:T.accent, fontWeight:600 }}>{dateFrom} → {dateTo}</span>}
           </div>
         </div>
 
-        <div style={{ flex:1, overflow:"auto", padding:"16px 18px" }}>
+        <div style={{ flex:1, overflow:"auto", padding:"20px 24px" }}>
 
           {/* Stats */}
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"10px", marginBottom:"18px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:"14px", marginBottom:"22px" }}>
             {STATS.map((s,i) => <StatCard key={i} {...s} T={T}/>)}
           </div>
 
           {/* Action items */}
-          <div style={{ marginBottom:"18px" }}>
+          <div style={{ marginBottom:"22px" }}>
             <div style={{ fontSize:"14px", fontWeight:700, color:T.text, marginBottom:"4px" }}>⚡ Needs Your Attention</div>
             <div style={{ fontSize:"11px", color:T.textMuted, marginBottom:"10px" }}>Resolve these before processing new orders</div>
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px" }}>
@@ -643,10 +666,10 @@ export default function Dashboard() {
           </div>
 
           {/* Charts row */}
-          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"12px", marginBottom:"18px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr", gap:"14px", marginBottom:"22px" }}>
 
             {/* Revenue bar chart */}
-            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"12px", overflow:"hidden" }}>
+            <div style={{ background:T.surface, border:`1px solid ${T.border}`, borderRadius:"16px", overflow:"hidden", boxShadow:"0 2px 12px rgba(0,0,0,0.05)" }}>
               <div style={{ padding:"13px 16px", borderBottom:`1px solid ${T.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
                 <div>
                   <div style={{ fontSize:"13px", fontWeight:700, color:T.text }}>Revenue & Performance</div>
@@ -713,7 +736,7 @@ export default function Dashboard() {
           </div>
 
           {/* Most ordered products */}
-          <div style={{ marginBottom:"18px" }}>
+          <div style={{ marginBottom:"22px" }}>
             <CardWrap title="🏆 Most Ordered Products" action="View all →" T={T}>
               <div style={{ padding:"0" }}>
                 <div style={{ display:"grid", gridTemplateColumns:"44px 1fr 100px 120px 130px 130px", padding:"8px 16px", background:T.tHead, borderBottom:`1px solid ${T.border}` }}>
@@ -746,7 +769,7 @@ export default function Dashboard() {
           </div>
 
           {/* Bottom row */}
-          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"12px", marginBottom:"16px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"14px", marginBottom:"16px" }}>
 
             {/* Source breakdown */}
             <CardWrap title="Orders by Source" T={T}>
